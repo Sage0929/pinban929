@@ -1,0 +1,1108 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>[hidden]{display:none!important}html,body{margin:0}img{max-width:100%}:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+<title>拼版台</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<style id="page-style"></style>
+<style>
+/* Layout: three-column workbench — settings | cutting mat with sheets | images & print guide */
+:root{
+  --bg:#e9eeeb; --panel:#f8faf9; --field:#ffffff; --line:#d3dcd7; --fg:#17201c; --muted:#5a6962;
+  --accent:#00739e; --accent-ink:#ffffff; --accent-soft:#e0f1f7;
+  --mat:#2e5c4d; --mat-line:rgba(255,255,255,.07); --mat-line2:rgba(255,255,255,.15); --mat-ink:#cfe3da;
+  --sel:#00a3d9; --good:#1d7f47; --warn:#a85208; --bad:#c22f2f;
+  --font:"Noto Sans SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1412; --panel:#161d1a; --field:#0f1513; --line:#2a3530; --fg:#e3ebe7; --muted:#93a39b;
+  --accent:#43b8e0; --accent-ink:#03202b; --accent-soft:#11303b;
+  --mat:#1c3a30; --mat-line:rgba(255,255,255,.05); --mat-line2:rgba(255,255,255,.11); --mat-ink:#a9c7ba;
+  --good:#4fcb84; --warn:#f0a35a; --bad:#ff7070; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1412; --panel:#161d1a; --field:#0f1513; --line:#2a3530; --fg:#e3ebe7; --muted:#93a39b;
+  --accent:#43b8e0; --accent-ink:#03202b; --accent-soft:#11303b;
+  --mat:#1c3a30; --mat-line:rgba(255,255,255,.05); --mat-line2:rgba(255,255,255,.11); --mat-ink:#a9c7ba;
+  --good:#4fcb84; --warn:#f0a35a; --bad:#ff7070; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:13px;line-height:1.5}
+*{box-sizing:border-box}
+button,input,select{font:inherit;color:inherit}
+.num,input[type=number]{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+.shell{height:100%;display:flex;flex-direction:column;gap:10px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+.top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.brand{font-size:20px;font-weight:700;letter-spacing:.04em}
+.brand small{font-size:12px;font-weight:400;color:var(--muted);margin-left:8px;letter-spacing:0}
+.summary{margin-left:auto;color:var(--muted);font-family:var(--mono);font-size:12px}
+.summary b{color:var(--fg);font-weight:500}
+
+.app{flex:1;min-height:0;display:grid;grid-template-columns:288px minmax(0,1fr) 300px;gap:10px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:auto;min-width:0}
+.sec{padding:14px 14px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
+.sec:last-child{border-bottom:0}
+.sec h2{margin:0;font-size:11px;font-weight:500;letter-spacing:.12em;color:var(--muted);display:flex;align-items:center;gap:8px}
+.sec h2 .r{margin-left:auto;letter-spacing:0}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>label{color:var(--muted);min-width:52px}
+.grow{flex:1;min-width:0}
+select,input[type=number],input[type=text]{background:var(--field);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+select{width:100%}
+input[type=number]{width:100%}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.field span{font-size:11px;color:var(--muted)}
+.unit{position:relative}
+.unit input{padding-right:30px}
+.unit::after{content:"mm";position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);font-family:var(--mono);pointer-events:none}
+
+.seg{display:flex;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:var(--field)}
+.seg button{flex:1;border:0;background:transparent;padding:6px 8px;cursor:pointer}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed=true]{background:var(--accent);color:var(--accent-ink)}
+
+.btn{border:1px solid var(--line);background:var(--field);border-radius:7px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:500}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.big{padding:9px 12px;width:100%;font-size:14px}
+.btn.danger{color:var(--bad)}
+.btn.armed{background:var(--bad);color:#fff;border-color:var(--bad)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:transparent;border-radius:99px;padding:2px 10px;font-family:var(--mono);font-size:12px;cursor:pointer}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+
+/* margin cross */
+.mx{display:grid;grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto auto auto;gap:6px;align-items:center}
+.mx .t{grid-column:2;grid-row:1}.mx .l{grid-column:1;grid-row:2}.mx .r{grid-column:3;grid-row:2}.mx .b{grid-column:2;grid-row:3}
+.mx .pv{grid-column:2;grid-row:2;aspect-ratio:210/297;max-height:56px;margin:auto;background:#fff;border:1px solid var(--line);position:relative;width:40px}
+.mx .pv i{position:absolute;border:1px dashed var(--accent)}
+.check{display:flex;gap:7px;align-items:center;cursor:pointer;user-select:none}
+.check input{accent-color:var(--accent);width:15px;height:15px;margin:0}
+
+.modes{display:grid;gap:6px}
+.mode{border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;display:grid;grid-template-columns:auto 1fr;gap:2px 8px;background:var(--field);text-align:left}
+.mode input{grid-row:span 2;margin:3px 0 0;accent-color:var(--accent)}
+.mode b{font-weight:500}
+.mode small{color:var(--muted);grid-column:2}
+.mode:has(input:checked){border-color:var(--accent);background:var(--accent-soft)}
+.subopts{display:flex;flex-direction:column;gap:7px;padding-left:2px}
+
+.note{font-size:12px;color:var(--muted);background:var(--bg);border-radius:7px;padding:8px 10px}
+.note.warn{color:var(--warn)}
+
+/* stage */
+.stagebox{display:flex;flex-direction:column;min-width:0;min-height:0;border-radius:10px;overflow:hidden;border:1px solid var(--line)}
+.bar{display:flex;gap:6px;align-items:center;padding:7px 10px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.bar .sp{flex:1}
+.bar .zl{font-family:var(--mono);font-size:12px;min-width:44px;text-align:center}
+.stage{flex:1;overflow:auto;position:relative;background-color:var(--mat);
+  background-image:linear-gradient(var(--mat-line2) 1px,transparent 1px),linear-gradient(90deg,var(--mat-line2) 1px,transparent 1px),
+  linear-gradient(var(--mat-line) 1px,transparent 1px),linear-gradient(90deg,var(--mat-line) 1px,transparent 1px);
+  background-size:100px 100px,100px 100px,20px 20px,20px 20px;padding:28px 40px 40px;display:flex;flex-direction:column;align-items:center;gap:30px}
+.sheetwrap{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.sheethead{display:flex;gap:10px;align-items:center;color:var(--mat-ink);font-size:12px;font-family:var(--mono);width:100%}
+.sheethead .sp{flex:1}
+.sheethead button{background:transparent;border:1px solid var(--mat-line2);color:var(--mat-ink);border-radius:6px;padding:1px 8px;cursor:pointer;font-family:var(--font);font-size:12px}
+.sheethead button.armed{background:var(--bad);border-color:var(--bad);color:#fff}
+.sheet{position:relative;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25),0 8px 24px rgba(0,0,0,.25);flex:none}
+.printable{position:absolute;border:1px dashed rgba(0,115,158,.55);pointer-events:none}
+.reg{position:absolute;width:16px;height:16px;pointer-events:none;color:var(--mat-ink);opacity:.8}
+.reg svg{display:block}
+.deco{z-index:4}
+.cuts{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+.item{position:absolute;overflow:hidden;cursor:grab;touch-action:none;outline:1px solid rgba(0,0,0,.08)}
+.item img{position:absolute;max-width:none;pointer-events:none;user-select:none;-webkit-user-drag:none}
+.item.out{outline:2px dashed var(--bad);outline-offset:-1px}
+.item.sel{outline:2px solid var(--sel);outline-offset:0;overflow:visible;z-index:2}
+.item.sel>.clip{overflow:hidden}
+.item.cell{outline:none;background:#fff;cursor:grab}
+.item.cell.sel{outline:2px solid var(--sel)}
+.item.cell .handle{display:none!important}
+.tplin{position:absolute;transform-origin:center}
+.tplimg{position:absolute;overflow:hidden}
+.tplin svg{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.tplimg .hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;color:#98a8a1;font-size:11px;line-height:1.3;pointer-events:none}
+.psheet .item.cell{background:transparent}
+.item .handle{display:none;position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;background:#fff;border:2px solid var(--sel);border-radius:3px;cursor:nwse-resize;z-index:3}
+.item.sel .handle{display:block}
+.item .dim{display:none;position:absolute;left:50%;bottom:6px;transform:translateX(-50%);background:rgba(10,20,16,.78);color:#fff;font:500 11px var(--mono);padding:1px 6px;border-radius:4px;white-space:nowrap;pointer-events:none;z-index:3}
+.item.sel .dim{display:block}
+.drop{position:absolute;inset:0;border:3px dashed var(--mat-ink);background:rgba(0,0,0,.25);display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;pointer-events:none;z-index:20}
+.oob{position:absolute;left:0;right:0;top:0;background:var(--bad);color:#fff;font-size:12px;padding:3px 8px;display:flex;gap:8px;align-items:center;z-index:4}
+.oob button{margin-left:auto;background:#fff;color:var(--bad);border:0;border-radius:4px;padding:0 8px;cursor:pointer}
+
+/* image list */
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+.thumb{position:relative;border:1px solid var(--line);border-radius:6px;overflow:hidden;aspect-ratio:1;background:var(--bg);cursor:pointer;padding:0}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .pg{position:absolute;left:3px;top:3px;background:rgba(10,20,16,.7);color:#fff;font:500 10px var(--mono);border-radius:3px;padding:0 4px}
+.thumb.sel{outline:2px solid var(--sel);outline-offset:1px}
+.empty{color:var(--muted);font-size:12px;border:1px dashed var(--line);border-radius:8px;padding:14px;text-align:center}
+.insp{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.insp .full{grid-column:1/-1}
+.pill{display:inline-block;font:500 11px var(--mono);padding:1px 7px;border-radius:99px;border:1px solid currentColor}
+.pill.good{color:var(--good)}.pill.warn{color:var(--warn)}.pill.bad{color:var(--bad)}
+.iname{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* guide */
+.kv{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:0}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;font-weight:500;min-width:0}
+.tips{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+.tips li{padding-left:2px}
+.tips li.w{color:var(--warn)}
+details{border-top:1px solid var(--line);padding-top:8px}
+summary{cursor:pointer;color:var(--accent);font-weight:500}
+.tw{overflow-x:auto;margin-top:8px}
+table{border-collapse:collapse;font-size:12px;width:100%;min-width:420px}
+th,td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+th{color:var(--muted);font-weight:500}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;z-index:50;font-size:13px;max-width:calc(100% - 32px)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:40;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal .box{background:var(--panel);border-radius:12px;max-width:900px;width:100%;max-height:100%;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:12px}
+.modal .imgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.modal figure{margin:0;display:flex;flex-direction:column;gap:6px}
+.modal figure img{border:1px solid var(--line);background:#fff}
+
+#print-root{display:none}
+@media print{
+  html,body{height:auto;background:#fff}
+  .shell,.toast,.modal{display:none!important}
+  #print-root{display:block}
+  .psheet{position:relative;overflow:hidden;background:#fff;break-after:page;page-break-after:always;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .psheet:last-child{break-after:auto;page-break-after:auto}
+  .psheet .item{outline:0}
+}
+@media (max-width:980px){
+  html,body{height:auto}
+  .app{grid-template-columns:1fr}
+  .stagebox{height:72vh;order:-1}
+  .panel{overflow:visible}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="shell">
+  <header class="top">
+    <div class="brand">拼版台<small>按纸张尺寸排图 · 一键铺满可打印区域</small></div>
+    <div class="summary" id="summary"></div>
+  </header>
+  <main class="app">
+    <aside class="panel" id="left">
+      <section class="sec">
+        <h2>纸张</h2>
+        <select id="paper" aria-label="纸张尺寸"></select>
+        <div class="row" id="customRow" hidden>
+          <div class="field grow"><span>宽</span><div class="unit"><input id="cw" type="number" min="20" max="1200" step="0.5"></div></div>
+          <div class="field grow"><span>高</span><div class="unit"><input id="ch" type="number" min="20" max="1200" step="0.5"></div></div>
+        </div>
+        <div class="seg" role="group" aria-label="方向">
+          <button id="oP" type="button">竖向</button><button id="oL" type="button">横向</button>
+        </div>
+      </section>
+
+      <section class="sec">
+        <h2>打孔 / 折页<span class="r num" id="holeInfo"></span></h2>
+        <select id="holes" aria-label="打孔预设"></select>
+        <div class="subopts" id="holeOpts">
+          <div class="row"><label>孔在</label><div class="seg grow" role="group"><button id="hsL" type="button">左边</button><button id="hsR" type="button">右边（背面）</button></div></div>
+          <div class="row">
+            <div class="field grow"><span>孔径</span><div class="unit"><input id="hd" type="number" min="2" max="12" step="0.5"></div></div>
+            <div class="field grow"><span>孔心距纸边</span><div class="unit"><input id="ho" type="number" min="3" max="20" step="0.5"></div></div>
+          </div>
+          <label class="check"><input type="checkbox" id="havoid">排版时避开孔区</label>
+          <label class="check"><input type="checkbox" id="hprint">打印孔位圈（手动打孔对位用）</label>
+        </div>
+        <label class="check" id="foldRow"><input type="checkbox" id="fprint">打印折线（虚线）</label>
+      </section>
+
+      <section class="sec">
+        <h2>活页拼版<span class="r" style="letter-spacing:0">把小活页排到大纸上</span></h2>
+        <div class="field"><span>成品页尺寸</span><select id="tplSel"></select></div>
+        <div class="row"><label>孔在</label><div class="seg grow" role="group"><button id="tL" type="button">左边</button><button id="tR" type="button">右边（背面）</button></div></div>
+        <div class="row"><label>数量</label><div class="grow"><input id="tplN" type="number" min="0" step="1" placeholder="0 = 铺满一张"></div></div>
+        <label class="check"><input type="checkbox" id="tplAvoid">图片避开孔区</label>
+        <label class="check"><input type="checkbox" id="tplFrame">打印裁切框</label>
+        <label class="check"><input type="checkbox" id="tplHoles">打印孔位圈</label>
+        <button class="btn primary big" id="tplGo" type="button">排到纸上</button>
+        <div class="row"><button class="btn grow" id="tplFillImgs" type="button">把图片依次放进空白页</button></div>
+        <div class="note" id="tplInfo"></div>
+      </section>
+
+      <section class="sec">
+        <h2>边距与间距<label class="check r"><input type="checkbox" id="linked">四边相同</label></h2>
+        <div class="mx">
+          <div class="field t"><span>上</span><div class="unit"><input id="mt" type="number" min="0" step="0.5"></div></div>
+          <div class="field l"><span>左</span><div class="unit"><input id="ml" type="number" min="0" step="0.5"></div></div>
+          <div class="pv" id="mpv"><i></i></div>
+          <div class="field r"><span>右</span><div class="unit"><input id="mr" type="number" min="0" step="0.5"></div></div>
+          <div class="field b"><span>下</span><div class="unit"><input id="mb" type="number" min="0" step="0.5"></div></div>
+        </div>
+        <div class="chips" aria-label="边距快捷值">
+          <button class="chip" data-m="0">0</button><button class="chip" data-m="3">3</button><button class="chip" data-m="5">5</button><button class="chip" data-m="10">10</button><button class="chip" data-m="15">15</button>
+        </div>
+        <div class="field"><span>图片之间的间距</span><div class="unit"><input id="gap" type="number" min="0" step="0.5"></div></div>
+      </section>
+
+      <section class="sec">
+        <h2>自动排版</h2>
+        <div class="modes">
+          <label class="mode"><input type="radio" name="mode" value="max"><b>最大化填满</b><small>每页的图片同比例放大到最大，铺满可打印区域</small></label>
+          <label class="mode"><input type="radio" name="mode" value="flow"><b>紧密排列</b><small>保持现在的尺寸，挤紧排放，放不下自动换页</small></label>
+        </div>
+        <div class="subopts">
+          <div class="row" id="sizingRow"><label>大小</label>
+            <div class="seg grow" role="group"><button id="szU" type="button">统一大小</button><button id="szR" type="button">保持相对大小</button></div>
+          </div>
+          <div class="row" id="scopeRow"><label>范围</label>
+            <div class="seg grow" role="group"><button id="scE" type="button">每页各自</button><button id="scA" type="button">合并到一页</button></div>
+          </div>
+          <label class="check"><input type="checkbox" id="rotate">允许旋转 90° 以塞下更多</label>
+          <label class="check"><input type="checkbox" id="center">整组居中</label>
+        </div>
+        <button class="btn primary big" id="auto" type="button">一键排版</button>
+      </section>
+
+      <section class="sec">
+        <h2>输出</h2>
+        <div class="field"><span>打印用纸类型</span><select id="media"></select></div>
+        <div class="row">
+          <label class="check grow"><input type="checkbox" id="cut">加裁切线</label>
+          <select id="dpi" style="width:auto" aria-label="导出分辨率"><option value="300">300 DPI</option><option value="200">200 DPI</option><option value="600">600 DPI</option></select>
+        </div>
+        <button class="btn primary big" id="print" type="button">打印</button>
+        <div class="row"><button class="btn grow" id="pdf" type="button">导出 PDF</button><button class="btn grow" id="png" type="button">导出图片</button></div>
+        <div class="note" id="embedNote" hidden>当前在预览框里运行，浏览器会拦截打印和下载。把这个页面部署到你自己的网址后即可正常使用；在这里可以先用「导出图片」，右键 / 长按保存。</div>
+      </section>
+    </aside>
+
+    <section class="stagebox">
+      <div class="bar">
+        <button class="btn" id="add" type="button">＋ 添加图片</button>
+        <input type="file" id="file" accept="image/*" multiple hidden>
+        <button class="btn" id="addPage" type="button">＋ 新页</button>
+        <span class="sp"></span>
+        <button class="btn" id="zOut" type="button" aria-label="缩小视图">−</button>
+        <span class="zl" id="zLabel">100%</span>
+        <button class="btn" id="zIn" type="button" aria-label="放大视图">＋</button>
+        <button class="btn" id="zFit" type="button">适应</button>
+      </div>
+      <div class="stage" id="stage" tabindex="0" aria-label="排版区，可拖入图片"></div>
+    </section>
+
+    <aside class="panel" id="right">
+      <section class="sec">
+        <h2>图片 <span id="imgCount" class="num"></span><span class="r row" style="gap:6px"><button class="btn danger" id="clearAll" type="button">清空</button></span></h2>
+        <div id="thumbs"></div>
+        <div class="note">支持 JPG / PNG / WebP，可多选、拖进排版区或直接 Ctrl+V 粘贴。</div>
+      </section>
+      <section class="sec" id="inspSec">
+        <h2>选中的图片</h2>
+        <div id="insp"></div>
+      </section>
+      <section class="sec">
+        <h2>打印设置建议</h2>
+        <div id="guide"></div>
+      </section>
+    </aside>
+  </main>
+</div>
+<div id="print-root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(()=>{
+const PAPERS=[
+ {g:'常用',id:'A4',n:'A4',w:210,h:297},
+ {g:'常用',id:'A5',n:'A5',w:148,h:210},
+ {g:'常用',id:'A3',n:'A3',w:297,h:420},
+ {g:'常用',id:'A6',n:'A6',w:105,h:148},
+ {g:'常用',id:'B5',n:'B5（ISO）',w:176,h:250},
+ {g:'常用',id:'B5J',n:'B5（JIS / 16开）',w:182,h:257},
+ {g:'常用',id:'letter',n:'Letter 美式信纸',w:215.9,h:279.4},
+ {g:'常用',id:'legal',n:'Legal',w:215.9,h:355.6},
+ {g:'活页手帐（带孔位）',id:'A6per',n:'A6per（国内常说的A6）',w:95,h:170,holes:'A6per'},
+ {g:'活页手帐（带孔位）',id:'A6per2',n:'A6per 二折页',w:178,h:170,land:true,holes:'A6per',folds:[95]},
+ {g:'活页手帐（带孔位）',id:'A6per3',n:'A6per 三折页',w:261,h:170,land:true,holes:'A6per',folds:[95,178]},
+ {g:'活页手帐（带孔位）',id:'A6b',n:'A6 活页（标准A6）',w:105,h:148,holes:'A6'},
+ {g:'活页手帐（带孔位）',id:'A7b',n:'A7 活页',w:82,h:123,holes:'A7'},
+ {g:'活页手帐（带孔位）',id:'A7b2',n:'A7 二折页',w:152,h:123,land:true,holes:'A7',folds:[82]},
+ {g:'活页手帐（带孔位）',id:'A7b3',n:'A7 三折页',w:222,h:123,land:true,holes:'A7',folds:[82,152]},
+ {g:'活页手帐（带孔位）',id:'M5',n:'M5 活页（74宽）',w:74,h:105,holes:'M5'},
+ {g:'活页手帐（带孔位）',id:'M5_67',n:'M5 活页（67宽）',w:67,h:105,holes:'M5'},
+ {g:'活页手帐（带孔位）',id:'M5_62',n:'M5 活页（62宽）',w:62,h:105,holes:'M5'},
+ {g:'活页手帐（带孔位）',id:'M52',n:'M5 二折页',w:136,h:105,land:true,holes:'M5',folds:[74]},
+ {g:'活页手帐（带孔位）',id:'M53',n:'M5 三折页',w:198,h:105,land:true,holes:'M5',folds:[74,136]},
+ {g:'活页手帐（带孔位）',id:'A5b',n:'A5 活页 6孔',w:148,h:210,holes:'A5'},
+ {g:'活页手帐（带孔位）',id:'A5S',n:'A5S 窄版',w:110,h:210,holes:'A5'},
+ {g:'活页手帐（带孔位）',id:'A5b2',n:'A5 6孔二折页',w:285,h:210,land:true,holes:'A5',folds:[148]},
+ {g:'活页手帐（带孔位）',id:'B5b',n:'B5 活页 9孔',w:182,h:257,holes:'B5'},
+ {g:'活页手帐（带孔位）',id:'A4b',n:'A4 活页 4孔',w:210,h:297,holes:'A4'},
+ {g:'照片纸',id:'4R',n:'6寸相纸（4R · 4×6in）',w:101.6,h:152.4,photo:'4×6 in / 10×15 cm'},
+ {g:'照片纸',id:'3R',n:'5寸相纸（3R · 3.5×5in）',w:88.9,h:127,photo:'3.5×5 in / 9×13 cm'},
+ {g:'照片纸',id:'5R',n:'7寸相纸（5R · 5×7in）',w:127,h:177.8,photo:'5×7 in / 13×18 cm'},
+ {g:'照片纸',id:'6R',n:'8寸相纸（6R · 6×8in）',w:152.4,h:203.2,photo:'6×8 in / 15×20 cm'},
+ {g:'照片纸',id:'8x10',n:'10寸相纸（8×10in）',w:203.2,h:254,photo:'8×10 in / 20×25 cm'},
+ {g:'卡片',id:'postcard',n:'明信片',w:100,h:148},
+ {g:'卡片',id:'card',n:'名片',w:54,h:90,land:true},
+ {g:'卡片',id:'A7',n:'A7（ISO）',w:74,h:105},
+ {g:'卡片',id:'B6',n:'B6（JIS）',w:128,h:182},
+ {g:'卡片',id:'TN',n:'TN 标准本',w:110,h:210},
+ {g:'其他',id:'custom',n:'自定义尺寸…'}
+];
+const HOLES={
+ none:{n:'不打孔'},
+ A6per:{n:'A6per 6孔 · 19/19/51/19/19',g:[19,19,51,19,19]},
+ A6:{n:'A6 标准 6孔 · 19/19/38/19/19',g:[19,19,38,19,19]},
+ A5:{n:'A5 / A5S 6孔 · 19/19/70/19/19',g:[19,19,70,19,19]},
+ A7:{n:'A7 6孔 · 19×5',g:[19,19,19,19,19]},
+ M5:{n:'M5 5孔 · 19×4',g:[19,19,19,19]},
+ B5:{n:'B5 9孔 · 19/19/51/19/19/51/19/19',g:[19,19,51,19,19,51,19,19]},
+ A4:{n:'A4 4孔 · 80×3',g:[80,80,80]},
+ A5_20:{n:'A5 20孔 · 孔距 9.5',g:Array(19).fill(9.5),d:5},
+ B5_26:{n:'B5 26孔 · 孔距 9.5',g:Array(25).fill(9.5),d:5},
+ A4_30:{n:'A4 30孔 · 孔距 9.5',g:Array(29).fill(9.5),d:5}
+};
+const MEDIA={
+ plain:{n:'普通纸 70–80g',driver:'普通纸 / Plain Paper',quality:'标准（图片多可选“高”）',printer:'喷墨、激光都可以',tips:['照片印在普通纸上会偏灰、发软，只适合草稿和校对尺寸','先用普通纸印一张，量一下尺寸对不对，再换贵的纸']},
+ matte:{n:'哑光照片纸',driver:'哑光照片纸 / Matte Photo Paper',quality:'高 / 最佳',printer:'仅喷墨',tips:['激光打印机不能用喷墨照片纸，涂层会被定影器烫坏','打印面是更白、更细的那一面','适合手帐贴图、可以用笔写字']},
+ glossy:{n:'光面 / 高光照片纸',driver:'光面照片纸 / Glossy Photo Paper',quality:'最佳 / 照片',printer:'仅喷墨',tips:['刚出纸时墨没干，平放晾 10–30 分钟再叠放或裁切','机器支持无边距的话，驱动里开“无边距”，同时把这里的边距设为 0','激光打印机不能用']},
+ card:{n:'卡纸 160–300g',driver:'厚纸 / 卡纸 / Cardstock',quality:'标准或高',printer:'喷墨、激光都行，先查机器支持的最大克重',tips:['用后进纸槽或手动单张进纸，走直通纸路不容易卡纸','激光机选“厚纸”模式，定影温度更高才粘得牢']},
+ label:{n:'不干胶 / 背胶贴纸',driver:'标签纸 / Labels（没有就选厚纸）',quality:'标准或高',printer:'按包装买对应版本：喷墨版或激光版',tips:['一次放一张，手动进纸','别印到背纸边缘，四边至少留 3mm','裁切线建议打开，剪的时候更准']},
+ tracing:{n:'硫酸纸 / 半透明纸',driver:'透明胶片，或普通纸 + 降低墨量',quality:'标准',printer:'喷墨干得很慢；激光需用耐热款',tips:['出纸后单独晾干 10 分钟以上','颜色会比白纸淡，深色图可以先提高饱和度']},
+ sticker:{n:'相纸贴纸 / 光面不干胶',driver:'光面照片纸 / Glossy',quality:'最佳',printer:'仅喷墨（喷墨专用款）',tips:['和光面相纸一样要晾干','做手帐贴纸时间距留 2–3mm，方便沿裁切线剪']}
+};
+const SIZE_PRESETS=[['1寸 25×35',25,35],['小1寸 22×32',22,32],['2寸 35×49',35,49],['小2寸 33×48',33,48],['5寸 89×127',88.9,127],['6寸 102×152',101.6,152.4],['7寸 127×178',127,177.8],['方形 50×50',50,50],['方形 80×80',80,80]];
+const EPS=1e-6;
+
+const S={paperId:'A4',custom:{w:210,h:297},orient:'portrait',m:{t:5,r:5,b:5,l:5},linked:true,gap:3,
+  mode:'max',sizing:'uniform',scope:'each',rotate:true,center:true,media:'plain',cut:false,dpi:300,holes:'none',holeSide:'left',holeD:5.5,holeOff:7,holeAvoid:true,holePrint:false,foldPrint:false,tplId:'M5',tplSide:'left',tplN:0,tplAvoid:false,tplFrame:true,tplHoles:true,
+  items:[],pages:1,sel:null,zoom:1};
+const SAVE=['paperId','custom','orient','m','linked','gap','mode','sizing','scope','rotate','center','media','cut','dpi','holes','holeSide','holeD','holeOff','holeAvoid','holePrint','foldPrint','tplId','tplSide','tplN','tplAvoid','tplFrame','tplHoles'];
+try{const raw=localStorage.getItem('pinban-settings'); if(raw){const o=JSON.parse(raw); SAVE.forEach(k=>{if(o[k]!==undefined)S[k]=o[k];});}}catch(e){}
+function save(){try{const o={};SAVE.forEach(k=>o[k]=S[k]);localStorage.setItem('pinban-settings',JSON.stringify(o));}catch(e){}}
+
+const $=s=>document.querySelector(s);
+const f1=v=>(Math.round(v*10)/10).toFixed(1).replace(/\.0$/,'');
+const uid=()=>Math.random().toString(36).slice(2,9);
+const byId=id=>S.items.find(i=>i.id===id);
+const onPage=p=>S.items.filter(i=>i.page===p);
+const paper=()=>PAPERS.find(p=>p.id===S.paperId)||PAPERS[0];
+function WH(){const p=paper();const w=p.id==='custom'?S.custom.w:p.w,h=p.id==='custom'?S.custom.h:p.h;const a=Math.min(w,h),b=Math.max(w,h);return S.orient==='portrait'?{W:a,H:b}:{W:b,H:a};}
+function area(){const {W,H}=WH();let l=S.m.l,r=S.m.r;if(S.holes!=='none'&&S.holeAvoid){const z=holeZone();if(S.holeSide==='left')l=Math.max(l,z);else r=Math.max(r,z);}return {x:l,y:S.m.t,w:W-l-r,h:H-S.m.t-S.m.b};}
+function holeZone(){return S.holeOff+S.holeD/2+2;}
+function holeCenters(){const hp=HOLES[S.holes];if(!hp||!hp.g)return [];const {W,H}=WH();const span=hp.g.reduce((a,b)=>a+b,0);let y=(H-span)/2;const x=S.holeSide==='left'?S.holeOff:W-S.holeOff;const out=[[x,y]];for(const d of hp.g){y+=d;out.push([x,y]);}return out;}
+function cellRegion(it){const t=it.tpl;if(!it.avoid||!HOLES[t.holes]||!HOLES[t.holes].g)return {x:0,y:0,w:t.w,h:t.h};const z=t.off+t.d/2+2;return t.side==='left'?{x:z,y:0,w:t.w-z,h:t.h}:{x:0,y:0,w:t.w-z,h:t.h};}
+function cellHoles(t){const hp=HOLES[t.holes];if(!hp||!hp.g)return [];const span=hp.g.reduce((a,b)=>a+b,0);let y=(t.h-span)/2;const x=t.side==='left'?t.off:t.w-t.off;const out=[[x,y]];for(const d of hp.g){y+=d;out.push([x,y]);}return out;}
+function cellSVG(it,screen){
+  const t=it.tpl;let s='';
+  if(screen)s+=`<rect x="0" y="0" width="${t.w}" height="${t.h}" fill="none" stroke="#8fa39b" stroke-width="0.3" stroke-dasharray="1.5 1"/>`;
+  else if(S.tplFrame)s+=`<rect x="0" y="0" width="${t.w}" height="${t.h}" fill="none" stroke="#aaa" stroke-width="0.2"/>`;
+  if(t.folds&&(screen||S.foldPrint))for(const f of t.folds)s+=`<line x1="${f}" y1="0" x2="${f}" y2="${t.h}" stroke="${screen?'#7d8f88':'#999'}" stroke-width="${screen?0.35:0.2}" stroke-dasharray="2 1.5"/>`;
+  if(screen||S.tplHoles)for(const c of cellHoles(t))s+=screen?`<circle cx="${c[0]}" cy="${c[1]}" r="${t.d/2}" style="fill:var(--mat)" stroke="rgba(0,0,0,.35)" stroke-width="0.25"/>`:`<circle cx="${c[0]}" cy="${c[1]}" r="${t.d/2}" fill="none" stroke="#888" stroke-width="0.2"/>`;
+  return `<svg viewBox="0 0 ${t.w} ${t.h}" preserveAspectRatio="none" aria-hidden="true">${s}</svg>`;
+}
+const cloneItem=it=>Object.assign({},it,{id:uid(),tpl:it.tpl?Object.assign({},it.tpl):undefined});
+const ordPos=(a,b)=>a.page-b.page||a.y-b.y||a.x-b.x;
+function tplOf(id){const p=PAPERS.find(x=>x.id===id&&x.holes)||PAPERS.find(x=>x.id==='M5');const hp=HOLES[p.holes];return {id:p.id,n:p.n,w:p.w,h:p.h,holes:p.holes,folds:p.folds||null,d:hp.d||5.5,off:S.holeOff,side:S.tplSide};}
+function tplLayout(tw,th){
+  const A=area(),g=S.gap;if(A.w<=0||A.h<=0)return [];
+  const grid=(w,h,rot)=>{const c=Math.floor((A.w+g+EPS)/(w+g)),r=Math.floor((A.h+g+EPS)/(h+g)),out=[];for(let i=0;i<r;i++)for(let j=0;j<c;j++)out.push({x:j*(w+g),y:i*(h+g),w,h,rot});return out;};
+  let best=grid(tw,th,false);const b2=grid(th,tw,true);if(b2.length>best.length)best=b2;
+  const N=Math.min(200,Math.floor(A.w*A.h/(tw*th)));
+  if(N>best.length){const rects=Array.from({length:N},(_,i)=>({key:'t'+i,w:tw,h:th}));for(const h of ['bl','bssf']){const r=packRects(rects,A.w,A.h,g,true,h);if(r.placed.length>best.length)best=r.placed.map(p=>({x:p.x,y:p.y,w:p.w,h:p.h,rot:p.rot}));}}
+  return best;
+}
+function firstEmptyPage(){for(let p=0;p<S.pages;p++)if(!onPage(p).length)return p;return S.pages++;}
+function assignImg(c,im){c.src=im.src;c.img=im.img;c.nw=im.nw;c.nh=im.nh;c.name=im.name;const pl=c.tpl.w>c.tpl.h,il=im.nw>im.nh;c.imgRot=(pl!==il&&Math.abs(im.nw-im.nh)>2)?90:0;}
+function fillCells(){
+  const cells=S.items.filter(i=>i.kind==='cell'&&!i.src).sort(ordPos);
+  const imgs=S.items.filter(i=>i.kind!=='cell'&&!i.sample).sort(ordPos);
+  let n=0;for(const c of cells){const im=imgs.shift();if(!im)break;assignImg(c,im);S.items=S.items.filter(i=>i!==im);n++;}
+  trimPages();return n;
+}
+function tplPlace(t,n){
+  const cells=tplLayout(t.w,t.h);
+  if(!cells.length){toast('这个成品尺寸比可打印区域还大，换大一点的纸或减小边距');return null;}
+  S.items=S.items.filter(i=>!i.sample);
+  let want=n>0?n:cells.length,made=0,page=firstEmptyPage();
+  while(want>0){
+    const use=cells.slice(0,Math.min(want,cells.length));
+    const placed=use.map(c=>{const it={id:uid(),kind:'cell',name:t.n,tpl:Object.assign({},t),page,x:0,y:0,w:t.w,h:t.h,rot:0,imgRot:0,avoid:S.tplAvoid,fit:'cover'};S.items.push(it);return {key:it.id,x:c.x,y:c.y,w:c.w,h:c.h,rot:c.rot};});
+    applyPlaced(placed,page);made+=use.length;want-=use.length;if(want>0)page=firstEmptyPage();
+  }
+  const filled=fillCells();
+  return {made,filled,per:cells.length};
+}
+function foldLines(){const p=paper();if(!p.folds)return [];const {W,H}=WH();return p.folds.map(f=>W>=H?[f,0,f,H]:[0,f,W,f]);}
+function decoSVG(screen){
+  const {W,H}=WH();let s='';
+  if(screen||S.foldPrint)for(const l of foldLines())s+=`<line x1="${l[0]}" y1="${l[1]}" x2="${l[2]}" y2="${l[3]}" stroke="${screen?'#7d8f88':'#999'}" stroke-width="${screen?0.35:0.2}" stroke-dasharray="2 1.5"/>`;
+  if(screen||S.holePrint)for(const c of holeCenters())s+=screen?`<circle cx="${c[0]}" cy="${c[1]}" r="${S.holeD/2}" style="fill:var(--mat)" stroke="rgba(0,0,0,.35)" stroke-width="0.25"/>`:`<circle cx="${c[0]}" cy="${c[1]}" r="${S.holeD/2}" fill="none" stroke="#888" stroke-width="0.2"/>`;
+  return s?`<svg class="cuts deco" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${s}</svg>`:'';
+}
+function isOut(it){const A=area();return it.x<A.x-0.05||it.y<A.y-0.05||it.x+it.w>A.x+A.w+0.05||it.y+it.h>A.y+A.h+0.05;}
+function util(p){const A=area();if(A.w<=0||A.h<=0)return 0;let s=0;for(const it of onPage(p)){const w=Math.max(0,Math.min(it.x+it.w,A.x+A.w)-Math.max(it.x,A.x));const h=Math.max(0,Math.min(it.y+it.h,A.y+A.h)-Math.max(it.y,A.y));s+=w*h;}return Math.min(100,s/(A.w*A.h)*100);}
+function dpiOf(it){if(it.kind==='cell'){if(!it.img)return null;const r=cellRegion(it);let nw=it.nw,nh=it.nh;if(it.imgRot)[nw,nh]=[nh,nw];return Math.round(Math.min(nw/(r.w/25.4),nh/(r.h/25.4)));}
+const nw=it.rot?it.nh:it.nw,nh=it.rot?it.nw:it.nh;const a=nw/(it.w/25.4),b=nh/(it.h/25.4);return Math.round(it.fit==='cover'?Math.min(a,b):Math.max(a,b));}
+
+let toastT;function toast(msg){let t=$('.toast');if(!t){t=document.createElement('div');t.className='toast';t.setAttribute('role','status');document.body.appendChild(t);}t.textContent=msg;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,2600);}
+
+/* ---------- packing (MaxRects) ---------- */
+function makeBin(W,H){
+  let free=[{x:0,y:0,w:W,h:H}];
+  const inter=(a,b)=>!(b.x>=a.x+a.w-EPS||b.x+b.w<=a.x+EPS||b.y>=a.y+a.h-EPS||b.y+b.h<=a.y+EPS);
+  const cont=(a,b)=>b.x>=a.x-EPS&&b.y>=a.y-EPS&&b.x+b.w<=a.x+a.w+EPS&&b.y+b.h<=a.y+a.h+EPS;
+  function occupy(r){
+    const out=[];
+    for(const f of free){
+      if(!inter(f,r)){out.push(f);continue;}
+      if(r.x>f.x+EPS)out.push({x:f.x,y:f.y,w:r.x-f.x,h:f.h});
+      if(r.x+r.w<f.x+f.w-EPS)out.push({x:r.x+r.w,y:f.y,w:f.x+f.w-(r.x+r.w),h:f.h});
+      if(r.y>f.y+EPS)out.push({x:f.x,y:f.y,w:f.w,h:r.y-f.y});
+      if(r.y+r.h<f.y+f.h-EPS)out.push({x:f.x,y:r.y+r.h,w:f.w,h:f.y+f.h-(r.y+r.h)});
+    }
+    free=out.filter((a,i)=>!out.some((b,j)=>j!==i&&cont(b,a)&&(!cont(a,b)||j<i)));
+  }
+  function find(w,h,allowRot,heur){
+    let best=null;
+    for(const f of free)for(const rot of allowRot?[false,true]:[false]){
+      const rw=rot?h:w,rh=rot?w:h;
+      if(rw<=f.w+EPS&&rh<=f.h+EPS){
+        let s1,s2;
+        if(heur==='bl'){s1=f.y+rh;s2=f.x;}else{const dw=f.w-rw,dh=f.h-rh;s1=Math.min(dw,dh);s2=Math.max(dw,dh);}
+        if(!best||s1<best.s1-EPS||(Math.abs(s1-best.s1)<=EPS&&s2<best.s2-EPS))best={x:f.x,y:f.y,w:rw,h:rh,rot,s1,s2};
+      }
+    }
+    return best;
+  }
+  return {occupy,find};
+}
+function packRects(rects,AW,AH,g,allowRot,heur){
+  const bin=makeBin(AW+g,AH+g),placed=[],rest=[];
+  for(const r of rects){
+    const p=bin.find(r.w+g,r.h+g,allowRot,heur);
+    if(!p){rest.push(r);continue;}
+    bin.occupy({x:p.x,y:p.y,w:p.w,h:p.h});
+    placed.push({key:r.key,x:p.x,y:p.y,w:p.w-g,h:p.h-g,rot:p.rot});
+  }
+  return {placed,rest};
+}
+const ORDERS=[(a,b)=>b.w*b.h-a.w*a.h,(a,b)=>Math.max(b.w,b.h)-Math.max(a.w,a.h),(a,b)=>b.h-a.h,(a,b)=>b.w-a.w];
+function packAll(rects,AW,AH,g,allowRot){
+  for(const o of ORDERS)for(const h of ['bssf','bl']){const r=packRects([...rects].sort(o),AW,AH,g,allowRot,h);if(!r.rest.length)return r.placed;}
+  return null;
+}
+function applyPlaced(placed,page){
+  const A=area();
+  let dx=0,dy=0;
+  if(S.center&&placed.length){
+    const x0=Math.min(...placed.map(p=>p.x)),y0=Math.min(...placed.map(p=>p.y));
+    const x1=Math.max(...placed.map(p=>p.x+p.w)),y1=Math.max(...placed.map(p=>p.y+p.h));
+    dx=(A.w-(x1-x0))/2-x0;dy=(A.h-(y1-y0))/2-y0;
+  }
+  for(const p of placed){
+    const it=byId(p.key);if(!it)continue;
+    if(p.rot)it.rot=it.rot?0:90;
+    it.w=p.w;it.h=p.h;it.x=A.x+p.x+dx;it.y=A.y+p.y+dy;it.page=page;
+  }
+}
+function maximizeList(list,page){
+  const A=area(),g=S.gap;
+  if(!list.length)return true;
+  const base=list.map(it=>{const a=it.w/it.h;return S.sizing==='uniform'?{key:it.id,w:Math.sqrt(a),h:1/Math.sqrt(a)}:{key:it.id,w:it.w,h:it.h};});
+  let hi=Infinity,sum=0;
+  for(const b of base){let f=Math.min(A.w/b.w,A.h/b.h);if(S.rotate)f=Math.max(f,Math.min(A.w/b.h,A.h/b.w));hi=Math.min(hi,f);sum+=b.w*b.h;}
+  hi=Math.min(hi,Math.sqrt(A.w*A.h/sum));
+  const at=s=>packAll(base.map(b=>({key:b.key,w:b.w*s,h:b.h*s})),A.w,A.h,g,S.rotate);
+  let lo=0,best=at(hi);
+  if(best)lo=hi;else for(let i=0;i<30;i++){const mid=(lo+hi)/2,r=at(mid);if(r){lo=mid;best=r;}else hi=mid;}
+  if(!best)return false;
+  applyPlaced(best,page);return true;
+}
+function flowAll(){
+  const A=area(),g=S.gap;let shrunk=0;
+  for(const it of S.items){
+    if(it.kind==='cell')continue;
+    const fits=(it.w<=A.w+EPS&&it.h<=A.h+EPS)||(S.rotate&&it.h<=A.w+EPS&&it.w<=A.h+EPS);
+    if(!fits){let f=Math.min(A.w/it.w,A.h/it.h);if(S.rotate)f=Math.max(f,Math.min(A.w/it.h,A.h/it.w));it.w*=f;it.h*=f;shrunk++;}
+  }
+  let rest=S.items.map(it=>({key:it.id,w:it.w,h:it.h})).sort(ORDERS[0]),page=0;
+  while(rest.length){
+    let best=null;
+    for(const h of ['bssf','bl']){const r=packRects(rest,A.w,A.h,g,S.rotate,h);if(!best||r.placed.length>best.placed.length)best=r;}
+    if(!best.placed.length)break;
+    applyPlaced(best.placed,page);rest=best.rest;page++;
+  }
+  S.pages=Math.max(1,page);
+  return shrunk;
+}
+function runAuto(){
+  const A=area();
+  if(!S.items.length){toast('先添加图片');return;}
+  if(A.w<=1||A.h<=1){toast('边距太大，没有可打印区域了');return;}
+  const hasCells=S.items.some(i=>i.kind==='cell');
+  if(S.mode==='flow'||hasCells){const n=flowAll();if(hasCells&&S.mode!=='flow'){toast(`有活页页面，按原尺寸紧密排列，共 ${S.pages} 页`);renderAll();return;}toast(n?`已排好，共 ${S.pages} 页（${n} 张比纸大，已缩小到能放下）`:`已紧密排列，共 ${S.pages} 页`);}
+  else{
+    if(S.scope==='all'){S.items.forEach(i=>i.page=0);S.pages=1;}
+    let ok=true;
+    for(let p=0;p<S.pages;p++)ok=maximizeList(onPage(p),p)&&ok;
+    trimPages();
+    toast(ok?'已放大到最大并铺满':'有的页放不下：图片太多或间距太大，试试减小间距');
+  }
+  renderAll();
+}
+function trimPages(){let last=0;S.items.forEach(i=>last=Math.max(last,i.page));S.pages=Math.max(1,Math.min(S.pages,last+1));}
+
+/* new images go into free space */
+function placeNew(list){
+  const A=area(),g=S.gap;
+  for(const it of list){
+    const a=it.nw/it.nh;let w=A.w*0.45,h=w/a;if(h>A.h*0.45){h=A.h*0.45;w=h*a;}it.w=Math.max(5,w);it.h=it.w/a;
+  }
+  let p=S.pages-1;
+  const binFor=pg=>{const bin=makeBin(A.w+g,A.h+g);for(const o of onPage(pg)){if(list.includes(o))continue;bin.occupy({x:o.x-A.x,y:o.y-A.y,w:o.w+g,h:o.h+g});}return bin;};
+  let bin=binFor(p);
+  for(const it of list){
+    let spot=bin.find(it.w+g,it.h+g,false,'bl');
+    if(!spot){p=S.pages;S.pages++;bin=binFor(p);spot=bin.find(it.w+g,it.h+g,false,'bl');}
+    if(!spot){spot={x:0,y:0,w:it.w+g,h:it.h+g};}
+    bin.occupy({x:spot.x,y:spot.y,w:it.w+g,h:it.h+g});
+    it.x=A.x+spot.x;it.y=A.y+spot.y;it.page=p;
+  }
+}
+
+/* fill a page with copies of one image */
+function fillCopies(it){
+  const A=area(),g=S.gap,bw=it.w,bh=it.h,brot=it.rot;
+  const grid=(w,h,r)=>({c:Math.floor((A.w+g+EPS)/(w+g)),r:Math.floor((A.h+g+EPS)/(h+g)),w,h,rot:r});
+  let gd=grid(bw,bh,false);if(S.rotate){const b=grid(bh,bw,true);if(b.c*b.r>gd.c*gd.r)gd=b;}
+  let cells=[];
+  for(let r=0;r<gd.r;r++)for(let c=0;c<gd.c;c++)cells.push({x:c*(gd.w+g),y:r*(gd.h+g),w:gd.w,h:gd.h,rot:gd.rot});
+  if(S.rotate){
+    const N=Math.min(400,Math.floor(A.w*A.h/(bw*bh)));
+    const rects=Array.from({length:N},(_,i)=>({key:'c'+i,w:bw,h:bh}));
+    for(const h of ['bl','bssf']){const r=packRects(rects,A.w,A.h,g,true,h);if(r.placed.length>cells.length)cells=r.placed.map(p=>({x:p.x,y:p.y,w:p.w,h:p.h,rot:p.rot}));}
+  }
+  if(!cells.length){toast('这张图比可打印区域还大，先缩小一点');return;}
+  let page=it.page;
+  if(onPage(page).length>1){page=S.pages;S.pages++;}
+  const placed=cells.map((c,i)=>{
+    const n=i===0?it:cloneItem(it);
+    if(i>0)S.items.push(n);
+    n.rot=c.rot?(brot?0:90):brot;
+    return {key:n.id,x:c.x,y:c.y,w:c.w,h:c.h,rot:false};
+  });
+  applyPlaced(placed,page);
+  toast(`第 ${page+1} 页铺了 ${cells.length} 张`);
+  renderAll();
+}
+
+/* ---------- rendering ---------- */
+let K=1;
+const stage=$('#stage');
+function styleItem(el,it,k){
+  const u=v=>k?(v*k)+'px':v+'mm';
+  el.style.left=u(it.x);el.style.top=u(it.y);el.style.width=u(it.w);el.style.height=u(it.h);
+  if(it.kind==='cell'){
+    const t=it.tpl,inn=el.querySelector('.tplin');
+    inn.style.width=u(t.w);inn.style.height=u(t.h);
+    if(it.rot){inn.style.left=u((it.w-t.w)/2);inn.style.top=u((it.h-t.h)/2);inn.style.transform='rotate(90deg)';}else{inn.style.left='0';inn.style.top='0';inn.style.transform='none';}
+    const r=cellRegion(it),box=inn.querySelector('.tplimg');box.style.left=u(r.x);box.style.top=u(r.y);box.style.width=u(r.w);box.style.height=u(r.h);
+    const img=box.querySelector('img');
+    if(img){if(it.imgRot){img.style.width=u(r.h);img.style.height=u(r.w);img.style.left=u((r.w-r.h)/2);img.style.top=u((r.h-r.w)/2);img.style.transform='rotate(90deg)';}else{img.style.width=u(r.w);img.style.height=u(r.h);img.style.left='0';img.style.top='0';img.style.transform='none';}img.style.objectFit='cover';}
+    const d=el.querySelector('.dim');if(d)d.textContent=`${f1(t.w)} × ${f1(t.h)} mm`;
+    return;
+  }
+  const img=el.querySelector('img');
+  if(it.rot){img.style.width=u(it.h);img.style.height=u(it.w);img.style.left=u((it.w-it.h)/2);img.style.top=u((it.h-it.w)/2);img.style.transform='rotate(90deg)';}
+  else{img.style.width=u(it.w);img.style.height=u(it.h);img.style.left='0';img.style.top='0';img.style.transform='none';}
+  img.style.objectFit=it.fit==='cover'?'cover':'contain';
+  const d=el.querySelector('.dim');if(d)d.textContent=`${f1(it.w)} × ${f1(it.h)} mm`;
+}
+function makeItem(it,k,forPrint){
+  const el=document.createElement('div');el.className='item';el.dataset.id=it.id;
+  if(it.kind==='cell'){
+    el.classList.add('cell');
+    const inn=document.createElement('div');inn.className='tplin';
+    const box=document.createElement('div');box.className='tplimg';
+    if(it.src){const img=document.createElement('img');img.src=it.src;img.alt=it.name;img.draggable=false;box.appendChild(img);}
+    else if(!forPrint)box.innerHTML='<span class="hint">拖图片<br>到这里</span>';
+    inn.appendChild(box);inn.insertAdjacentHTML('beforeend',cellSVG(it,!forPrint));el.appendChild(inn);
+    if(!forPrint){const d=document.createElement('span');d.className='dim';el.appendChild(d);if(it.id===S.sel)el.classList.add('sel');if(isOut(it))el.classList.add('out');}
+    styleItem(el,it,k);return el;
+  }
+  const img=document.createElement('img');img.src=it.src;img.alt=it.name;img.draggable=false;el.appendChild(img);
+  if(!forPrint){
+    const h=document.createElement('span');h.className='handle';h.title='拖动等比缩放';el.appendChild(h);
+    const d=document.createElement('span');d.className='dim';el.appendChild(d);
+    if(it.id===S.sel)el.classList.add('sel');
+    if(isOut(it))el.classList.add('out');
+  }
+  styleItem(el,it,k);return el;
+}
+function cutSegs(its){
+  const o=1,L=3,out=[];
+  for(const it of its){const x1=it.x,y1=it.y,x2=it.x+it.w,y2=it.y+it.h;
+    out.push([x1-o-L,y1,x1-o,y1],[x1,y1-o-L,x1,y1-o],[x2+o,y1,x2+o+L,y1],[x2,y1-o-L,x2,y1-o],
+             [x1-o-L,y2,x1-o,y2],[x1,y2+o,x1,y2+o+L],[x2+o,y2,x2+o+L,y2],[x2,y2+o,x2,y2+o+L]);}
+  return out;
+}
+function cutSVG(its){
+  const {W,H}=WH();
+  return `<svg class="cuts" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${cutSegs(its).map(s=>`<line x1="${s[0]}" y1="${s[1]}" x2="${s[2]}" y2="${s[3]}" stroke="#000" stroke-width="0.2"/>`).join('')}</svg>`;
+}
+const REG='<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1"><circle cx="8" cy="8" r="4.5"/><path d="M8 0v16M0 8h16"/></svg>';
+function calcK(){
+  const {W,H}=WH();
+  const sw=stage.clientWidth-80,sh=stage.clientHeight-80;
+  let k=Math.min(sw/W,sh>120?sh/H:sw/W);
+  if(!isFinite(k)||k<=0)k=2;
+  return Math.max(0.4,k*S.zoom);
+}
+function render(){
+  const {W,H}=WH(),A=area();K=calcK();
+  stage.innerHTML='';
+  for(let p=0;p<S.pages;p++){
+    const wrap=document.createElement('section');wrap.className='sheetwrap';
+    const its=onPage(p),outN=its.filter(isOut).length;
+    wrap.innerHTML=`<div class="sheethead"><span>第 ${p+1} 页 · ${its.length} 张 · 利用率 ${Math.round(util(p))}%</span><span class="sp"></span>${S.pages>1?`<button type="button" data-delpage="${p}">删除此页</button>`:''}</div>`;
+    const sh=document.createElement('div');sh.className='sheet';sh.dataset.p=p;sh.style.width=W*K+'px';sh.style.height=H*K+'px';
+    sh.innerHTML=`<div class="printable" style="left:${A.x*K}px;top:${A.y*K}px;width:${Math.max(0,A.w*K)}px;height:${Math.max(0,A.h*K)}px"></div>`
+      +(S.cut?cutSVG(its):'')
+      +[0,1,2,3].map(i=>`<span class="reg" style="${i%2===0?'left:-22px':'right:-22px'};${i<2?'top:-22px':'bottom:-22px'}">${REG}</span>`).join('');
+    for(const it of its)sh.appendChild(makeItem(it,K,false));
+    sh.insertAdjacentHTML('beforeend',decoSVG(true));
+    if(outN){const b=document.createElement('div');b.className='oob';b.innerHTML=`<span>${outN} 张超出可打印区域，打印会被切掉</span><button type="button" data-fix="1">一键排版</button>`;sh.appendChild(b);}
+    wrap.appendChild(sh);stage.appendChild(wrap);
+  }
+  $('#zLabel').textContent=Math.round(S.zoom*100)+'%';
+}
+function renderSummary(){
+  const {W,H}=WH(),p=paper();
+  const avg=S.pages?Array.from({length:S.pages},(_,i)=>util(i)).reduce((a,b)=>a+b,0)/S.pages:0;
+  $('#summary').innerHTML=`<b>${p.id==='custom'?'自定义':p.n.replace(/（.*/,'')}</b> ${f1(W)}×${f1(H)}mm · 可打印 ${f1(Math.max(0,area().w))}×${f1(Math.max(0,area().h))}mm · <b>${S.pages}</b> 页 · <b>${S.items.filter(i=>i.src).length}</b> 张${S.items.some(i=>i.kind==='cell')?` · 活页 <b>${S.items.filter(i=>i.kind==='cell').length}</b> 页`:''} · 平均利用率 <b>${Math.round(avg)}%</b>`;
+}
+function renderThumbs(){
+  const withImg=S.items.filter(i=>i.src);
+  $('#imgCount').textContent=withImg.length?`(${withImg.length})`:'';
+  const t=$('#thumbs');
+  if(!withImg.length){t.className='';t.innerHTML='<div class="empty">还没有图片。点「添加图片」，或把图片拖到中间的排版区。</div>';return;}
+  t.className='thumbs';
+  t.innerHTML=withImg.map(it=>`<button type="button" class="thumb${it.id===S.sel?' sel':''}" data-pick="${it.id}" title="${it.name}"><img src="${it.src}" alt=""><span class="pg">P${it.page+1}${it.kind==='cell'?' · 页':''}</span></button>`).join('');
+}
+function renderInsp(){
+  const it=byId(S.sel),box=$('#insp');
+  if(!it){box.innerHTML='<div class="empty">点一下排版区里的图片来调整尺寸、位置和旋转。<br>拖动右下角方块可以等比缩放。</div>';return;}
+  if(it.kind==='cell'){
+    const t=it.tpl,hp=HOLES[t.holes],d=dpiOf(it);
+    const pill=d===null?'<span class="pill warn">空白页</span>':`<span class="pill ${d>=280?'good':d>=170?'warn':'bad'}">${d} DPI · ${d>=280?'清晰':d>=170?'可用':'偏糊'}</span>`;
+    box.innerHTML=`<div class="insp">
+      <div class="full row" style="gap:8px"><span class="iname grow">${t.n}</span>${pill}</div>
+      <div class="full note">成品 ${f1(t.w)}×${f1(t.h)}mm · ${hp.g?hp.g.length+1+' 孔':'无孔'}${t.folds?' · 折线 '+t.folds.join('/')+'mm':''}<br>${it.src?'图片：'+it.name:'把一张图拖到这一页上就会放进来，再拖一张会替换。'}</div>
+      <div class="full row"><label style="color:var(--muted)">孔在</label><div class="seg grow" role="group"><button type="button" data-act="cleft" aria-pressed="${t.side==='left'}">左边</button><button type="button" data-act="cright" aria-pressed="${t.side==='right'}">右边（背面）</button></div></div>
+      <label class="check full"><input type="checkbox" id="cavoid" ${it.avoid?'checked':''}>图片避开孔区</label>
+      <div class="full row">
+        ${it.src?'<button class="btn" data-act="cimgrot" type="button">图片转 90°</button><button class="btn" data-act="cout" type="button">取出图片</button>':''}
+        <button class="btn" data-act="rot" type="button">整页旋转 90°</button>
+      </div>
+      <div class="full row"><button class="btn" data-act="dup" type="button">复制这一页</button><button class="btn" data-act="fill" type="button">用这页铺满一张纸</button><button class="btn danger" data-act="del" type="button">删除</button></div>
+      ${isOut(it)?'<div class="note warn full">这一页超出了可打印区域。</div>':''}
+    </div>`;
+    return;
+  }
+  const d=dpiOf(it),cls=d>=280?'good':d>=170?'warn':'bad',lbl=d>=280?'清晰':d>=170?'可用':'偏糊';
+  box.innerHTML=`<div class="insp">
+    <div class="full row" style="gap:8px"><span class="iname grow" title="${it.name}">${it.name}</span><span class="pill ${cls}" title="按当前打印尺寸算出的分辨率">${d} DPI · ${lbl}</span></div>
+    <div class="field"><span>宽</span><div class="unit"><input id="iw" type="number" step="0.5" min="2" value="${f1(it.w)}"></div></div>
+    <div class="field"><span>高</span><div class="unit"><input id="ih" type="number" step="0.5" min="2" value="${f1(it.h)}"></div></div>
+    <div class="field"><span>X（距左边）</span><div class="unit"><input id="ix" type="number" step="0.5" value="${f1(it.x)}"></div></div>
+    <div class="field"><span>Y（距上边）</span><div class="unit"><input id="iy" type="number" step="0.5" value="${f1(it.y)}"></div></div>
+    <label class="check full"><input type="checkbox" id="ilock" ${it.lock?'checked':''}>锁定比例</label>
+    <div class="field full"><span>图片与框比例不同时</span><select id="ifit"><option value="contain"${it.fit==='contain'?' selected':''}>完整显示（可能留白）</option><option value="cover"${it.fit==='cover'?' selected':''}>裁切填满</option></select></div>
+    <div class="field full"><span>常用尺寸（证件照 / 冲印）</span><select id="ipreset"><option value="">选择后自动裁切填满…</option>${SIZE_PRESETS.map((s,i)=>`<option value="${i}">${s[0]} mm</option>`).join('')}</select></div>
+    <div class="full row">
+      <button class="btn" data-act="smaller" type="button">缩小 10%</button><button class="btn" data-act="bigger" type="button">放大 10%</button><button class="btn" data-act="rot" type="button">旋转 90°</button>
+    </div>
+    <div class="full row">
+      <button class="btn" data-act="dup" type="button">复制一张</button><button class="btn" data-act="fill" type="button">用这张铺满一页</button><button class="btn danger" data-act="del" type="button">删除</button>
+    </div>
+    ${isOut(it)?'<div class="note warn full">这张图超出了可打印区域，超出部分不会被打印。</div>':''}
+  </div>`;
+}
+function renderGuide(){
+  const p=paper(),md=MEDIA[S.media]||MEDIA.plain,{W,H}=WH();
+  const small=Math.max(W,H)<=210&&Math.min(W,H)<=148&&!p.photo;
+  const tips=[];
+  if(p.photo){
+    tips.push(`驱动里的纸张尺寸选「${p.photo}」，照片纸一般放后进纸槽或照片纸盒。`);
+    tips.push('想要没有白边：机型要支持无边距打印，驱动里打开“无边距”，这里边距设为 0。');
+    tips.push('没有能进这个尺寸的打印机？可以在 A4 上拼几张，印完沿裁切线裁。<button class="btn" data-act="toA4" type="button" style="margin-left:4px">改成 A4 拼版</button>');
+  }else if(p.holes&&Math.min(W,H)<=150){
+    tips.push('这么小的活页纸，很多打印机进不了。可以在 A4 上拼几页，印完沿框裁切、对着孔位圈打孔。<button class="btn" data-act="toA4" type="button" style="margin-left:4px">改成 A4 拼版</button>');
+  }else if(small){
+    tips.push('小于 A5 的纸，很多家用打印机进纸不稳。更稳的做法是拼在 A4 上，印完裁切。<button class="btn" data-act="toA4" type="button" style="margin-left:4px">改成 A4 拼版</button>');
+  }else if(p.id==='A3'){
+    tips.push('需要 A3 幅面的打印机。只有 A4 机器的话，可以拆成两张 A4 打印再拼接。');
+  }else if(p.id==='letter'||p.id==='legal'){
+    tips.push('国内打印机驱动默认多是 A4，记得把纸张切到 '+(p.id==='letter'?'Letter':'Legal')+'，否则会被缩放。');
+  }else if(p.id==='A4'){
+    tips.push('打印前确认驱动里的纸张也是 A4（有些机器出厂默认 Letter）。');
+  }
+  const hp=HOLES[S.holes];
+  if(hp.g){
+    tips.push(`孔位按「${hp.n.split(' · ')[0]}」画在${S.holeSide==='left'?'左':'右'}边，上下居中。孔心距是通行值，不同品牌有 1–2mm 误差，先用普通纸印一张套进活页夹核对。`);
+    tips.push(`用对应孔距的活页打孔器，纸边顶住挡板打孔；打开「打印孔位圈」可以对着圈打。`);
+    tips.push('自己做双面活页：正面孔在左，印背面前切到「右边（背面）」，图案就不会压到孔。');
+    if(!S.holeAvoid)tips.push('<span>没开「避开孔区」，图片可能被孔打穿。</span>');
+  }
+  if(S.items.some(i=>i.kind==='cell'))tips.push('活页拼版：沿灰色细框裁切（可以打开「加裁切线」更好对齐），再用对应的活页打孔器对着孔位圈打孔。先用普通纸试一张对孔位。');
+  if(paper().folds)tips.push(`折页展开宽 ${f1(WH().W)}mm，折线距左边 ${paper().folds.join(' / ')}mm。跨折线的图会被折到，重要内容放在单面内。`);
+  const mn=Math.min(S.m.t,S.m.r,S.m.b,S.m.l);
+  if(mn<3)tips.push('<span>边距小于 3mm：不开无边距时，多数打印机最外圈 3–5mm 印不到，边缘可能被切掉。</span>');
+  const low=S.items.filter(i=>{const d=dpiOf(i);return d!==null&&d<170;}).length;
+  if(low)tips.push(`<span>有 ${low} 张图分辨率偏低（< 170 DPI），印出来会糊，建议换原图或缩小尺寸。</span>`);
+  md.tips.forEach(t=>tips.push(t));
+  $('#guide').innerHTML=`<dl class="kv">
+    <dt>纸张尺寸</dt><dd>${p.id==='custom'?'自定义':p.n} · ${f1(W)}×${f1(H)} mm</dd>
+    <dt>纸张类型</dt><dd>${md.driver}</dd>
+    <dt>打印质量</dt><dd>${md.quality}</dd>
+    <dt>打印机</dt><dd>${md.printer}</dd>
+    <dt>缩放</dt><dd>实际大小 / 100%（不要选“适合页面”）</dd>
+    <dt>浏览器边距</dt><dd>无（边距已经在这里设好了）</dd>
+    <dt>页眉页脚</dt><dd>关闭</dd>
+  </dl>
+  <ul class="tips">${tips.map(t=>`<li class="${/^<span>/.test(t)?'w':''}">${t}</li>`).join('')}</ul>
+  <details><summary>纸张类型速查表</summary><div class="tw"><table><thead><tr><th>纸</th><th>驱动里选</th><th>质量</th><th>打印机</th></tr></thead><tbody>
+  ${Object.values(MEDIA).map(m=>`<tr><td>${m.n}</td><td>${m.driver}</td><td>${m.quality}</td><td>${m.printer}</td></tr>`).join('')}
+  </tbody></table></div></details>
+  <details><summary>分辨率怎么看</summary><ul class="tips" style="margin-top:8px"><li>300 DPI 以上：照片级清晰。</li><li>170–300 DPI：近看略软，贴手帐、做卡片够用。</li><li>170 DPI 以下：能看到颗粒或模糊。</li><li>同一张图印得越大，DPI 越低。选中图片可以看它当前的 DPI。</li></ul></details>`;
+}
+function syncControls(){
+  const sel=$('#paper');
+  if(!sel.options.length){let g='',og;for(const p of PAPERS){if(p.g!==g){og=document.createElement('optgroup');og.label=g=p.g;sel.appendChild(og);}const o=document.createElement('option');o.value=p.id;o.textContent=p.id==='custom'?p.n:`${p.n}  ${f1(p.w)}×${f1(p.h)}`;og.appendChild(o);}}
+  sel.value=S.paperId;$('#customRow').hidden=S.paperId!=='custom';$('#cw').value=S.custom.w;$('#ch').value=S.custom.h;
+  $('#oP').setAttribute('aria-pressed',S.orient==='portrait');$('#oL').setAttribute('aria-pressed',S.orient==='landscape');
+  ['t','r','b','l'].forEach(k=>$('#m'+k).value=S.m[k]);$('#linked').checked=S.linked;$('#gap').value=S.gap;
+  document.querySelectorAll('input[name=mode]').forEach(r=>r.checked=r.value===S.mode);
+  $('#szU').setAttribute('aria-pressed',S.sizing==='uniform');$('#szR').setAttribute('aria-pressed',S.sizing==='relative');
+  $('#scE').setAttribute('aria-pressed',S.scope==='each');$('#scA').setAttribute('aria-pressed',S.scope==='all');
+  $('#sizingRow').hidden=$('#scopeRow').hidden=S.mode!=='max';
+  $('#rotate').checked=S.rotate;$('#center').checked=S.center;
+  const hs=$('#holes');if(!hs.options.length)hs.innerHTML=Object.entries(HOLES).map(([k,h])=>`<option value="${k}">${h.n}</option>`).join('');
+  hs.value=S.holes;const hp=HOLES[S.holes];$('#holeOpts').hidden=!hp.g;
+  $('#holeInfo').textContent=hp.g?`${hp.g.length+1} 孔 · 跨度 ${f1(hp.g.reduce((a,b)=>a+b,0))}mm`:'';
+  $('#hsL').setAttribute('aria-pressed',S.holeSide==='left');$('#hsR').setAttribute('aria-pressed',S.holeSide==='right');
+  $('#hd').value=S.holeD;$('#ho').value=S.holeOff;$('#havoid').checked=S.holeAvoid;$('#hprint').checked=S.holePrint;
+  $('#foldRow').hidden=!paper().folds;$('#fprint').checked=S.foldPrint;
+  const ts=$('#tplSel');if(!ts.options.length)ts.innerHTML=PAPERS.filter(p=>p.holes).map(p=>`<option value="${p.id}">${p.n}  ${f1(p.w)}×${f1(p.h)}</option>`).join('');
+  ts.value=S.tplId;$('#tL').setAttribute('aria-pressed',S.tplSide==='left');$('#tR').setAttribute('aria-pressed',S.tplSide==='right');
+  $('#tplN').value=S.tplN||'';$('#tplAvoid').checked=S.tplAvoid;$('#tplFrame').checked=S.tplFrame;$('#tplHoles').checked=S.tplHoles;
+  {const t=tplOf(S.tplId),pp=paper();
+   if(pp.holes)$('#tplInfo').innerHTML='当前纸张本身就是活页尺寸。拼版要先换成 A4 等大纸，点「排到纸上」会自动换成 A4。';
+   else{const n=tplLayout(t.w,t.h).length;$('#tplInfo').textContent=n?`当前纸上每张可放 ${n} 页（成品 ${f1(t.w)}×${f1(t.h)}mm）`:'成品比可打印区域还大，换大一点的纸或减小边距';}}
+  const ms=$('#media');if(!ms.options.length)ms.innerHTML=Object.entries(MEDIA).map(([k,m])=>`<option value="${k}">${m.n}</option>`).join('');
+  ms.value=S.media;$('#cut').checked=S.cut;$('#dpi').value=String(S.dpi);
+  const {W,H}=WH(),pv=$('#mpv');pv.style.aspectRatio=`${W}/${H}`;pv.style.width=W>H?'56px':'40px';
+  const i=pv.querySelector('i');i.style.left=S.m.l/W*100+'%';i.style.right=S.m.r/W*100+'%';i.style.top=S.m.t/H*100+'%';i.style.bottom=S.m.b/H*100+'%';
+}
+function renderSide(){renderThumbs();renderInsp();renderGuide();renderSummary();}
+function renderAll(){syncControls();render();renderSide();save();}
+
+/* ---------- controls ---------- */
+$('#paper').addEventListener('change',e=>{S.paperId=e.target.value;const p=paper();S.orient=p.land?'landscape':'portrait';S.holes=p.holes||'none';S.holeD=(HOLES[S.holes].d)||5.5;renderAll();});
+$('#tplSel').onchange=e=>{S.tplId=e.target.value;renderAll();};
+$('#tL').onclick=()=>{S.tplSide='left';renderAll();};$('#tR').onclick=()=>{S.tplSide='right';renderAll();};
+$('#tplN').addEventListener('change',e=>{S.tplN=Math.max(0,Math.floor(+e.target.value||0));renderAll();});
+$('#tplAvoid').onchange=e=>{S.tplAvoid=e.target.checked;save();};
+$('#tplFrame').onchange=e=>{S.tplFrame=e.target.checked;renderAll();};
+$('#tplHoles').onchange=e=>{S.tplHoles=e.target.checked;renderAll();};
+$('#tplGo').onclick=()=>{
+  if(paper().holes){S.paperId='A4';S.orient='portrait';S.holes='none';if(S.m.t<5)S.m={t:5,r:5,b:5,l:5};if(S.gap<2)S.gap=3;}
+  const r=tplPlace(tplOf(S.tplId),S.tplN);if(!r){renderAll();return;}
+  renderAll();toast(`排了 ${r.made} 页（每张纸 ${r.per} 页）${r.filled?`，放入 ${r.filled} 张图`:'，把图片拖进页面，或直接添加图片'}`);
+};
+$('#tplFillImgs').onclick=()=>{const n=fillCells();renderAll();toast(n?`放入了 ${n} 张图`:'没有空白页或没有可放的图片');};
+$('#holes').onchange=e=>{S.holes=e.target.value;S.holeD=(HOLES[S.holes].d)||5.5;renderAll();};
+$('#hsL').onclick=()=>{S.holeSide='left';renderAll();};$('#hsR').onclick=()=>{S.holeSide='right';renderAll();};
+$('#hd').addEventListener('change',e=>{S.holeD=Math.min(12,Math.max(2,+e.target.value||5.5));renderAll();});
+$('#ho').addEventListener('change',e=>{S.holeOff=Math.min(20,Math.max(3,+e.target.value||7));renderAll();});
+$('#havoid').onchange=e=>{S.holeAvoid=e.target.checked;renderAll();};
+$('#hprint').onchange=e=>{S.holePrint=e.target.checked;renderAll();};
+$('#fprint').onchange=e=>{S.foldPrint=e.target.checked;renderAll();};
+$('#cw').addEventListener('change',e=>{S.custom.w=Math.max(20,+e.target.value||20);renderAll();});
+$('#ch').addEventListener('change',e=>{S.custom.h=Math.max(20,+e.target.value||20);renderAll();});
+$('#oP').onclick=()=>{S.orient='portrait';renderAll();};
+$('#oL').onclick=()=>{S.orient='landscape';renderAll();};
+['t','r','b','l'].forEach(k=>$('#m'+k).addEventListener('change',e=>{const v=Math.max(0,+e.target.value||0);if(S.linked)S.m={t:v,r:v,b:v,l:v};else S.m[k]=v;renderAll();}));
+$('#linked').onchange=e=>{S.linked=e.target.checked;if(S.linked){const v=S.m.t;S.m={t:v,r:v,b:v,l:v};}renderAll();};
+document.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{const v=+b.dataset.m;S.m={t:v,r:v,b:v,l:v};S.linked=true;renderAll();});
+$('#gap').addEventListener('change',e=>{S.gap=Math.max(0,+e.target.value||0);renderAll();});
+document.querySelectorAll('input[name=mode]').forEach(r=>r.onchange=()=>{S.mode=r.value;renderAll();});
+$('#szU').onclick=()=>{S.sizing='uniform';renderAll();};$('#szR').onclick=()=>{S.sizing='relative';renderAll();};
+$('#scE').onclick=()=>{S.scope='each';renderAll();};$('#scA').onclick=()=>{S.scope='all';renderAll();};
+$('#rotate').onchange=e=>{S.rotate=e.target.checked;save();};
+$('#center').onchange=e=>{S.center=e.target.checked;save();};
+$('#auto').onclick=runAuto;
+$('#media').onchange=e=>{S.media=e.target.value;renderAll();};
+$('#cut').onchange=e=>{S.cut=e.target.checked;renderAll();};
+$('#dpi').onchange=e=>{S.dpi=+e.target.value;save();};
+$('#add').onclick=()=>$('#file').click();
+$('#file').onchange=e=>{const fs=[...e.target.files];e.target.value='';addFiles(fs);};
+$('#addPage').onclick=()=>{S.pages++;renderAll();stage.scrollTop=stage.scrollHeight;};
+$('#zIn').onclick=()=>{S.zoom=Math.min(4,S.zoom*1.25);render();};
+$('#zOut').onclick=()=>{S.zoom=Math.max(0.25,S.zoom/1.25);render();};
+$('#zFit').onclick=()=>{S.zoom=1;render();};
+function arm(btn,label,fn){
+  if(btn.dataset.armed){fn();return;}
+  const old=btn.textContent;btn.dataset.armed='1';btn.classList.add('armed');btn.textContent=label;
+  setTimeout(()=>{if(btn.isConnected){delete btn.dataset.armed;btn.classList.remove('armed');btn.textContent=old;}},3000);
+}
+$('#clearAll').onclick=e=>{if(!S.items.length)return;arm(e.currentTarget,'确认清空？',()=>{S.items=[];S.sel=null;S.pages=1;renderAll();});};
+
+$('#thumbs').addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(!b)return;S.sel=b.dataset.pick;renderAll();
+  const el=stage.querySelector(`.item[data-id="${S.sel}"]`);if(el)el.scrollIntoView({block:'nearest',inline:'nearest'});});
+
+$('#right').addEventListener('change',e=>{
+  const it=byId(S.sel);if(!it)return;const t=e.target,v=+t.value;
+  if(t.id==='cavoid'){it.avoid=t.checked;renderAll();return;}
+  if(t.id==='iw'&&v>0){const a=it.w/it.h;it.w=v;if(it.lock)it.h=v/a;else if(it.fit!=='cover')it.fit='cover';}
+  else if(t.id==='ih'&&v>0){const a=it.w/it.h;it.h=v;if(it.lock)it.w=v*a;else if(it.fit!=='cover')it.fit='cover';}
+  else if(t.id==='ix')it.x=v;else if(t.id==='iy')it.y=v;
+  else if(t.id==='ilock'){it.lock=t.checked;if(it.lock){const a=(it.rot?it.nh/it.nw:it.nw/it.nh);it.h=it.w/a;}}
+  else if(t.id==='ifit')it.fit=t.value;
+  else if(t.id==='ipreset'&&t.value!==''){const s=SIZE_PRESETS[+t.value];let w=s[1],h=s[2];if((it.w>it.h)!==(w>h)&&w!==h){[w,h]=[h,w];}it.w=w;it.h=h;it.lock=false;it.fit='cover';}
+  else return;
+  renderAll();
+});
+$('#right').addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;const act=b.dataset.act;
+  if(act==='toA4'&&paper().holes){
+    const p=paper();S.paperId='A4';S.orient='portrait';S.holes='none';if(S.m.t<5){S.m={t:5,r:5,b:5,l:5};}if(S.gap<2)S.gap=3;
+    S.tplId=p.id;S.items=S.items.filter(i=>!i.sample);
+    const loose=S.items.filter(i=>i.kind!=='cell');
+    if(!S.items.some(i=>i.kind==='cell')){loose.forEach(i=>i.page=-1);S.pages=0;}
+    const r=tplPlace(tplOf(p.id),loose.length);
+    loose.forEach(i=>{if(i.page<0&&S.items.includes(i))i.page=0;});
+    if(!S.pages)S.pages=1;
+    renderAll();if(r)toast(`已改成 A4 拼版：${r.made} 个「${p.n}」页面，放入 ${r.filled} 张图`);return;
+  }
+  if(act==='toA4'){S.paperId='A4';S.orient='portrait';S.holes='none';S.cut=true;if(S.m.t<5){S.m={t:5,r:5,b:5,l:5};}if(S.gap<2)S.gap=3;if(S.items.length){S.mode='flow';flowAll();}renderAll();toast('已改成 A4 拼版，并打开裁切线');return;}
+  const it=byId(S.sel);if(!it)return;
+  if(act==='cleft'||act==='cright'){it.tpl.side=act==='cleft'?'left':'right';}
+  else if(act==='cimgrot'){it.imgRot=it.imgRot?0:90;}
+  else if(act==='cout'){const a=it.nh/it.nw,w=Math.min(60,it.w),n={id:uid(),name:it.name,src:it.src,img:it.img,nw:it.nw,nh:it.nh,page:it.page,x:it.x+6,y:it.y+6,w,h:w*a,rot:0,fit:'contain',lock:true};S.items.push(n);it.src=null;it.img=null;S.sel=n.id;}
+  else if(act==='smaller'||act==='bigger'){const f=act==='bigger'?1.1:1/1.1,cx=it.x+it.w/2,cy=it.y+it.h/2;it.w*=f;it.h*=f;it.x=cx-it.w/2;it.y=cy-it.h/2;}
+  else if(act==='rot'){const cx=it.x+it.w/2,cy=it.y+it.h/2;it.rot=it.rot?0:90;[it.w,it.h]=[it.h,it.w];it.x=cx-it.w/2;it.y=cy-it.h/2;}
+  else if(act==='dup'){const n=Object.assign(cloneItem(it),{x:it.x+5,y:it.y+5});S.items.push(n);S.sel=n.id;}
+  else if(act==='fill'){fillCopies(it);return;}
+  else if(act==='del'){S.items=S.items.filter(i=>i!==it);S.sel=null;}
+  renderAll();
+});
+
+/* ---------- stage interaction ---------- */
+let drag=null;
+stage.addEventListener('click',e=>{
+  const dp=e.target.closest('[data-delpage]');
+  if(dp){const p=+dp.dataset.delpage;arm(dp,onPage(p).length?`确认删除（含 ${onPage(p).length} 张）`:'确认删除',()=>{S.items=S.items.filter(i=>i.page!==p);S.items.forEach(i=>{if(i.page>p)i.page--;});S.pages=Math.max(1,S.pages-1);if(S.sel&&!byId(S.sel))S.sel=null;renderAll();});return;}
+  if(e.target.closest('[data-fix]'))runAuto();
+});
+stage.addEventListener('pointerdown',e=>{
+  if(e.button!==0)return;
+  const itEl=e.target.closest('.item');
+  if(!itEl){if(e.target.closest('.sheet')&&!e.target.closest('.oob')){S.sel=null;stage.querySelectorAll('.item.sel').forEach(x=>x.classList.remove('sel'));renderSide();}return;}
+  const it=byId(itEl.dataset.id);if(!it)return;
+  e.preventDefault();
+  S.sel=it.id;stage.querySelectorAll('.item.sel').forEach(x=>x.classList.remove('sel'));itEl.classList.add('sel');renderSide();
+  itEl.setPointerCapture(e.pointerId);
+  const sheet=itEl.parentElement,r=sheet.getBoundingClientRect();
+  drag={it,el:itEl,resize:!!e.target.closest('.handle'),sx:e.clientX,sy:e.clientY,ox:it.x,oy:it.y,ow:it.w,oh:it.h,
+        gx:(e.clientX-r.left)/K-it.x,gy:(e.clientY-r.top)/K-it.y,moved:false};
+});
+function snapAxis(v,size,cands,th){let best=v,bd=th;for(const c of cands){const d=Math.abs(c-v);if(d<bd){bd=d;best=c;}}return best;}
+window.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const it=drag.it,A=area(),{W,H}=WH(),g=S.gap,th=6/K;
+  drag.moved=true;
+  if(drag.resize){
+    const a=drag.ow/drag.oh,dx=(e.clientX-drag.sx)/K,dy=(e.clientY-drag.sy)/K;
+    let nw=Math.max(4,drag.ow+Math.max(dx,dy*a));
+    if(!e.altKey){const right=A.x+A.w-it.x,bottom=(A.y+A.h-it.y)*a;if(Math.abs(nw-right)<th)nw=right;else if(Math.abs(nw-bottom)<th*a)nw=bottom;}
+    it.w=nw;it.h=nw/a;
+  }else{
+    let target=drag.el.parentElement;
+    for(const sh of stage.querySelectorAll('.sheet')){const r=sh.getBoundingClientRect();if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom){target=sh;break;}}
+    if(target!==drag.el.parentElement){target.appendChild(drag.el);it.page=+target.dataset.p;}
+    const r=target.getBoundingClientRect();
+    let nx=(e.clientX-r.left)/K-drag.gx,ny=(e.clientY-r.top)/K-drag.gy;
+    if(!e.altKey){
+      const xs=[A.x,A.x+A.w-it.w,(W-it.w)/2],ys=[A.y,A.y+A.h-it.h,(H-it.h)/2];
+      for(const o of onPage(it.page)){if(o===it)continue;xs.push(o.x,o.x+o.w-it.w,o.x+o.w+g,o.x-g-it.w);ys.push(o.y,o.y+o.h-it.h,o.y+o.h+g,o.y-g-it.h);}
+      nx=snapAxis(nx,it.w,xs,th);ny=snapAxis(ny,it.h,ys,th);
+    }
+    it.x=nx;it.y=ny;
+  }
+  styleItem(drag.el,it,K);
+  drag.el.classList.toggle('out',isOut(it));
+});
+window.addEventListener('pointerup',e=>{
+  if(!drag)return;const d=drag;drag=null;
+  if(d.moved&&!d.resize&&d.it.kind!=='cell'&&d.it.src){
+    const hit=document.elementsFromPoint(e.clientX,e.clientY).map(x=>x.closest&&x.closest('.item.cell')).find(x=>x&&x!==d.el);
+    const cell=hit&&byId(hit.dataset.id);
+    if(cell){
+      if(cell.src){const old={src:cell.src,img:cell.img,nw:cell.nw,nh:cell.nh,name:cell.name};assignImg(cell,d.it);Object.assign(d.it,old,{rot:0,fit:'contain',lock:true,x:d.ox,y:d.oy,h:d.it.w*old.nh/old.nw});}
+      else{assignImg(cell,d.it);S.items=S.items.filter(i=>i!==d.it);}
+      S.sel=cell.id;toast('已放进这一页');
+    }
+  }
+  if(d.moved)renderAll();
+});
+stage.addEventListener('wheel',e=>{if(!e.ctrlKey)return;e.preventDefault();S.zoom=Math.min(4,Math.max(0.25,S.zoom*(e.deltaY<0?1.1:1/1.1)));render();},{passive:false});
+document.addEventListener('keydown',e=>{
+  if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
+  const it=byId(S.sel);if(!it)return;
+  const st=e.shiftKey?10:1;let hit=true;
+  if(e.key==='ArrowLeft')it.x-=st;else if(e.key==='ArrowRight')it.x+=st;else if(e.key==='ArrowUp')it.y-=st;else if(e.key==='ArrowDown')it.y+=st;
+  else if(e.key==='Delete'||e.key==='Backspace'){S.items=S.items.filter(i=>i!==it);S.sel=null;}
+  else if((e.key==='+'||e.key==='=')&&it.kind!=='cell'){const c=[it.x+it.w/2,it.y+it.h/2];it.w*=1.05;it.h*=1.05;it.x=c[0]-it.w/2;it.y=c[1]-it.h/2;}
+  else if(e.key==='-'&&it.kind!=='cell'){const c=[it.x+it.w/2,it.y+it.h/2];it.w/=1.05;it.h/=1.05;it.x=c[0]-it.w/2;it.y=c[1]-it.h/2;}
+  else hit=false;
+  if(hit){e.preventDefault();renderAll();}
+});
+
+/* ---------- adding images ---------- */
+function loadImg(src){return new Promise((res,rej)=>{const im=new Image();im.onload=()=>res(im);im.onerror=rej;im.src=src;});}
+async function addFiles(files){
+  const list=[];
+  for(const f of files){
+    if(!f.type.startsWith('image/'))continue;
+    const src=URL.createObjectURL(f);
+    try{const im=await loadImg(src);list.push({id:uid(),name:f.name||'粘贴的图片',src,img:im,nw:im.naturalWidth,nh:im.naturalHeight,page:0,x:0,y:0,w:10,h:10,rot:0,fit:'contain',lock:true});}
+    catch(err){toast(`${f.name} 打不开，换成 JPG 或 PNG 试试`);}
+  }
+  if(!list.length)return;
+  const hadSamples=S.items.length&&S.items.every(i=>i.sample);
+  if(hadSamples){S.items=[];S.pages=1;}
+  const empties=S.items.filter(i=>i.kind==='cell'&&!i.src).sort(ordPos),rest=[];let intoCells=0;
+  for(const im of list){const c=empties.shift();if(c){assignImg(c,im);intoCells++;S.sel=c.id;}else rest.push(im);}
+  if(rest.length){S.items.push(...rest);placeNew(rest);S.sel=rest[rest.length-1].id;}
+  if(intoCells){renderAll();toast(`${intoCells} 张放进了空白活页${rest.length?`，另外 ${rest.length} 张放在纸上`:''}`);return;}
+  renderAll();
+  toast(hadSamples?`已移除示例，添加了 ${list.length} 张。点「一键排版」铺满`:`添加了 ${list.length} 张`);
+}
+let dragDepth=0,dropEl=null;
+stage.addEventListener('dragenter',e=>{if(!e.dataTransfer.types.includes('Files'))return;e.preventDefault();dragDepth++;if(!dropEl){dropEl=document.createElement('div');dropEl.className='drop';dropEl.textContent='松开即可添加图片';stage.parentElement.style.position='relative';stage.parentElement.appendChild(dropEl);}});
+stage.addEventListener('dragover',e=>{if(e.dataTransfer.types.includes('Files'))e.preventDefault();});
+stage.addEventListener('dragleave',()=>{dragDepth=Math.max(0,dragDepth-1);if(!dragDepth&&dropEl){dropEl.remove();dropEl=null;}});
+stage.addEventListener('drop',e=>{e.preventDefault();dragDepth=0;if(dropEl){dropEl.remove();dropEl=null;}addFiles([...e.dataTransfer.files]);});
+document.addEventListener('paste',e=>{const fs=[...(e.clipboardData?.files||[])];if(fs.length){e.preventDefault();addFiles(fs);}});
+
+/* ---------- output ---------- */
+function buildPrint(){
+  const {W,H}=WH();
+  $('#page-style').textContent=`@page{size:${W}mm ${H}mm;margin:0}`;
+  const root=$('#print-root');root.innerHTML='';
+  for(let p=0;p<S.pages;p++){
+    const sh=document.createElement('div');sh.className='psheet';sh.style.width=W+'mm';sh.style.height=H+'mm';
+    const its=onPage(p);if(S.cut)sh.innerHTML=cutSVG(its);
+    for(const it of its)sh.appendChild(makeItem(it,null,true));
+    sh.insertAdjacentHTML('beforeend',decoSVG(false));
+    root.appendChild(sh);
+  }
+}
+window.addEventListener('beforeprint',buildPrint);
+$('#print').onclick=()=>{if(!S.items.length){toast('先添加图片');return;}buildPrint();try{window.print();}catch(e){}};
+function drawCell(ctx,it,k){
+  const t=it.tpl;ctx.save();ctx.translate((it.x+it.w/2)*k,(it.y+it.h/2)*k);if(it.rot)ctx.rotate(Math.PI/2);ctx.translate(-t.w*k/2,-t.h*k/2);
+  if(it.img){const r=cellRegion(it);ctx.save();ctx.beginPath();ctx.rect(r.x*k,r.y*k,r.w*k,r.h*k);ctx.clip();ctx.translate((r.x+r.w/2)*k,(r.y+r.h/2)*k);
+    let dw=r.w*k,dh=r.h*k;if(it.imgRot){ctx.rotate(Math.PI/2);[dw,dh]=[dh,dw];}
+    const img=it.img,nw=img.naturalWidth,nh=img.naturalHeight,ia=nw/nh,ba=dw/dh;let sx=0,sy=0,sw=nw,sh=nh;if(ia>ba){sw=nh*ba;sx=(nw-sw)/2;}else{sh=nw/ba;sy=(nh-sh)/2;}
+    ctx.drawImage(img,sx,sy,sw,sh,-dw/2,-dh/2,dw,dh);ctx.restore();}
+  const lw=Math.max(1,0.2*k);
+  if(S.tplFrame){ctx.strokeStyle='#aaa';ctx.lineWidth=lw;ctx.strokeRect(0,0,t.w*k,t.h*k);}
+  if(t.folds&&S.foldPrint){ctx.save();ctx.strokeStyle='#999';ctx.lineWidth=lw;ctx.setLineDash([2*k,1.5*k]);for(const f of t.folds){ctx.beginPath();ctx.moveTo(f*k,0);ctx.lineTo(f*k,t.h*k);ctx.stroke();}ctx.restore();}
+  if(S.tplHoles){ctx.strokeStyle='#888';ctx.lineWidth=lw;for(const c of cellHoles(t)){ctx.beginPath();ctx.arc(c[0]*k,c[1]*k,t.d/2*k,0,Math.PI*2);ctx.stroke();}}
+  ctx.restore();
+}
+function drawItem(ctx,it,k){
+  if(it.kind==='cell'){drawCell(ctx,it,k);return;}
+  const img=it.img;if(!img)return;
+  const bw=it.w*k,bh=it.h*k;
+  ctx.save();ctx.translate((it.x+it.w/2)*k,(it.y+it.h/2)*k);
+  ctx.beginPath();ctx.rect(-bw/2,-bh/2,bw,bh);ctx.clip();
+  let dw=bw,dh=bh;if(it.rot){ctx.rotate(Math.PI/2);dw=bh;dh=bw;}
+  const nw=img.naturalWidth,nh=img.naturalHeight,ia=nw/nh,ba=dw/dh;
+  if(it.fit==='cover'){let sx=0,sy=0,sw=nw,sh=nh;if(ia>ba){sw=nh*ba;sx=(nw-sw)/2;}else{sh=nw/ba;sy=(nh-sh)/2;}ctx.drawImage(img,sx,sy,sw,sh,-dw/2,-dh/2,dw,dh);}
+  else{const s=Math.min(dw/nw,dh/nh);ctx.drawImage(img,-nw*s/2,-nh*s/2,nw*s,nh*s);}
+  ctx.restore();
+}
+function pageCanvas(p,dpi){
+  const {W,H}=WH(),k=dpi/25.4,c=document.createElement('canvas');
+  c.width=Math.round(W*k);c.height=Math.round(H*k);
+  const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.imageSmoothingQuality='high';
+  const its=onPage(p);
+  if(S.cut){ctx.strokeStyle='#000';ctx.lineWidth=Math.max(1,0.2*k);for(const s of cutSegs(its)){ctx.beginPath();ctx.moveTo(s[0]*k,s[1]*k);ctx.lineTo(s[2]*k,s[3]*k);ctx.stroke();}}
+  for(const it of its)drawItem(ctx,it,k);
+  if(S.foldPrint){ctx.save();ctx.strokeStyle='#999';ctx.lineWidth=Math.max(1,0.2*k);ctx.setLineDash([2*k,1.5*k]);for(const l of foldLines()){ctx.beginPath();ctx.moveTo(l[0]*k,l[1]*k);ctx.lineTo(l[2]*k,l[3]*k);ctx.stroke();}ctx.restore();}
+  if(S.holePrint){ctx.strokeStyle='#888';ctx.lineWidth=Math.max(1,0.2*k);for(const c of holeCenters()){ctx.beginPath();ctx.arc(c[0]*k,c[1]*k,S.holeD/2*k,0,Math.PI*2);ctx.stroke();}}
+  return c;
+}
+function download(url,name){const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();}
+$('#pdf').onclick=async()=>{
+  if(!S.items.length){toast('先添加图片');return;}
+  const J=window.jspdf&&window.jspdf.jsPDF;if(!J){toast('PDF 组件没加载成功，刷新页面再试');return;}
+  toast('正在生成 PDF…');await new Promise(r=>setTimeout(r,30));
+  const {W,H}=WH(),doc=new J({orientation:W>H?'l':'p',unit:'mm',format:[W,H],compress:true});
+  for(let p=0;p<S.pages;p++){if(p)doc.addPage([W,H],W>H?'l':'p');doc.addImage(pageCanvas(p,S.dpi).toDataURL('image/jpeg',0.93),'JPEG',0,0,W,H,undefined,'FAST');}
+  doc.save(`拼版_${paper().id}_${S.pages}页.pdf`);
+};
+$('#png').onclick=async()=>{
+  if(!S.items.length){toast('先添加图片');return;}
+  toast('正在生成图片…');await new Promise(r=>setTimeout(r,30));
+  const urls=[];
+  for(let p=0;p<S.pages;p++){const c=pageCanvas(p,S.dpi);const b=await new Promise(r=>c.toBlob(r,'image/png'));urls.push({url:URL.createObjectURL(b),w:c.width,h:c.height});}
+  const m=document.createElement('div');m.className='modal';
+  m.innerHTML=`<div class="box" role="dialog" aria-label="导出的图片"><div class="row"><b class="grow">导出的图片（${S.dpi} DPI）</b><button class="btn" data-close type="button">关闭</button></div>
+  <div class="note">点「下载」保存；如果没反应，在图片上右键「图片另存为」或手机长按保存。</div>
+  <div class="imgs">${urls.map((u,i)=>`<figure><img src="${u.url}" alt="第 ${i+1} 页"><div class="row"><span class="num grow">第 ${i+1} 页 · ${u.w}×${u.h}px</span><button class="btn" data-dl="${i}" type="button">下载</button></div></figure>`).join('')}</div></div>`;
+  m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-close]')){m.remove();urls.forEach(u=>URL.revokeObjectURL(u.url));}const d=e.target.closest('[data-dl]');if(d)download(urls[+d.dataset.dl].url,`拼版_第${+d.dataset.dl+1}页.png`);});
+  document.body.appendChild(m);
+};
+
+/* ---------- start ---------- */
+try{if(window.self!==window.top)$('#embedNote').hidden=false;}catch(e){$('#embedNote').hidden=false;}
+function sample(w,h,c1,c2,label){
+  const c=document.createElement('canvas');c.width=w;c.height=h;const x=c.getContext('2d');
+  const gr=x.createLinearGradient(0,0,0,h);gr.addColorStop(0,c1);gr.addColorStop(1,c2);x.fillStyle=gr;x.fillRect(0,0,w,h);
+  x.fillStyle='rgba(255,255,255,.35)';x.beginPath();x.arc(w*.72,h*.3,Math.min(w,h)*.12,0,7);x.fill();
+  x.fillStyle='rgba(0,0,0,.18)';x.beginPath();x.moveTo(0,h);x.lineTo(w*.3,h*.55);x.lineTo(w*.55,h*.8);x.lineTo(w*.8,h*.5);x.lineTo(w,h*.75);x.lineTo(w,h);x.fill();
+  x.fillStyle='#fff';x.font=`600 ${Math.round(Math.min(w,h)*.08)}px "Noto Sans SC",sans-serif`;x.textAlign='center';x.fillText(label,w/2,h*.55);
+  return c.toDataURL('image/jpeg',0.9);
+}
+(async()=>{
+  const defs=[[1800,1200,'#7fb7d6','#3c6e8f','示例 · 3:2'],[1000,1500,'#e3a77b','#9b5a3c','示例 · 2:3'],[1400,1400,'#9cc7a0','#4d7f55','示例 · 1:1'],[1200,1500,'#b9a6d9','#6a5a93','示例 · 4:5']];
+  for(const d of defs){const src=sample(...d);const im=await loadImg(src);S.items.push({id:uid(),name:d[4],src,img:im,nw:d[0],nh:d[1],page:0,x:0,y:0,w:d[0]/d[1],h:1,rot:0,fit:'contain',lock:true,sample:true});}
+  const saved={mode:S.mode,center:S.center};S.mode='max';
+  maximizeList(S.items,0);Object.assign(S,saved);
+  renderAll();
+})();
+renderAll();
+let rq;new ResizeObserver(()=>{cancelAnimationFrame(rq);rq=requestAnimationFrame(render);}).observe(stage);
+})();
+</script>
+
+</body>
+</html>
