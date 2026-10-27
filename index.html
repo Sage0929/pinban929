@@ -127,7 +127,9 @@ select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid 
 .item.sel{outline:2px solid var(--sel);outline-offset:0;overflow:visible;z-index:2}
 .item.sel>.clip{overflow:hidden}
 .item.cell{outline:none;background:#fff;cursor:grab}
-.item.cell.sel{outline:2px solid var(--sel)}
+.item.cell.sel{outline:none;z-index:auto}
+.chip.on{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#cellList .chips{margin-top:4px}
 .item.cell .handle{display:none!important}
 .tplin{position:absolute;transform-origin:center}
 .tplimg{position:absolute;overflow:hidden}
@@ -232,12 +234,11 @@ th{color:var(--muted);font-weight:500}
         <h2>活页拼版<span class="r" style="letter-spacing:0">把小活页排到大纸上</span></h2>
         <div class="field"><span>成品页尺寸</span><select id="tplSel"></select></div>
         <div class="row"><label>孔在</label><div class="seg grow" role="group"><button id="tL" type="button">左边</button><button id="tR" type="button">右边（背面）</button></div></div>
-        <div class="row"><label>数量</label><div class="grow"><input id="tplN" type="number" min="0" step="1" placeholder="0 = 铺满一张"></div></div>
-        <label class="check"><input type="checkbox" id="tplAvoid">图片避开孔区</label>
+        <div class="row"><label>数量</label><div class="grow"><input id="tplN" type="number" min="1" max="60" step="1"></div></div>
         <label class="check"><input type="checkbox" id="tplFrame">打印裁切框</label>
         <label class="check"><input type="checkbox" id="tplHoles">打印孔位圈</label>
-        <button class="btn primary big" id="tplGo" type="button">排到纸上</button>
-        <div class="row"><button class="btn grow" id="tplFillImgs" type="button">把图片依次放进空白页</button></div>
+        <button class="btn primary big" id="tplGo" type="button">添加活页</button>
+        <div class="row"><button class="btn grow" id="tplSheet" type="button">新开一张纸铺满</button></div>
         <div class="note" id="tplInfo"></div>
       </section>
 
@@ -306,6 +307,7 @@ th{color:var(--muted);font-weight:500}
       <section class="sec">
         <h2>图片 <span id="imgCount" class="num"></span><span class="r row" style="gap:6px"><button class="btn danger" id="clearAll" type="button">清空</button></span></h2>
         <div id="thumbs"></div>
+        <div id="cellList" hidden></div>
         <div class="note">支持 JPG / PNG / WebP，可多选、拖进排版区或直接 Ctrl+V 粘贴。</div>
       </section>
       <section class="sec" id="inspSec">
@@ -388,7 +390,7 @@ const SIZE_PRESETS=[['1寸 25×35',25,35],['小1寸 22×32',22,32],['2寸 35×49
 const EPS=1e-6;
 
 const S={paperId:'A4',custom:{w:210,h:297},orient:'portrait',m:{t:5,r:5,b:5,l:5},linked:true,gap:3,
-  mode:'max',sizing:'uniform',scope:'each',rotate:true,center:true,media:'plain',cut:false,dpi:300,holes:'none',holeSide:'left',holeD:5.5,holeOff:7,holeAvoid:true,holePrint:false,foldPrint:false,tplId:'M5',tplSide:'left',tplN:0,tplAvoid:false,tplFrame:true,tplHoles:true,
+  mode:'max',sizing:'uniform',scope:'each',rotate:true,center:true,media:'plain',cut:false,dpi:300,holes:'none',holeSide:'left',holeD:5.5,holeOff:7,holeAvoid:true,holePrint:false,foldPrint:false,tplId:'M5',tplSide:'left',tplN:1,tplAvoid:false,tplFrame:true,tplHoles:true,
   items:[],pages:1,sel:null,zoom:1};
 const SAVE=['paperId','custom','orient','m','linked','gap','mode','sizing','scope','rotate','center','media','cut','dpi','holes','holeSide','holeD','holeOff','holeAvoid','holePrint','foldPrint','tplId','tplSide','tplN','tplAvoid','tplFrame','tplHoles'];
 try{const raw=localStorage.getItem('pinban-settings'); if(raw){const o=JSON.parse(raw); SAVE.forEach(k=>{if(o[k]!==undefined)S[k]=o[k];});}}catch(e){}
@@ -406,13 +408,26 @@ function holeZone(){return S.holeOff+S.holeD/2+2;}
 function holeCenters(){const hp=HOLES[S.holes];if(!hp||!hp.g)return [];const {W,H}=WH();const span=hp.g.reduce((a,b)=>a+b,0);let y=(H-span)/2;const x=S.holeSide==='left'?S.holeOff:W-S.holeOff;const out=[[x,y]];for(const d of hp.g){y+=d;out.push([x,y]);}return out;}
 function cellRegion(it){const t=it.tpl;if(!it.avoid||!HOLES[t.holes]||!HOLES[t.holes].g)return {x:0,y:0,w:t.w,h:t.h};const z=t.off+t.d/2+2;return t.side==='left'?{x:z,y:0,w:t.w-z,h:t.h}:{x:0,y:0,w:t.w-z,h:t.h};}
 function cellHoles(t){const hp=HOLES[t.holes];if(!hp||!hp.g)return [];const span=hp.g.reduce((a,b)=>a+b,0);let y=(t.h-span)/2;const x=t.side==='left'?t.off:t.w-t.off;const out=[[x,y]];for(const d of hp.g){y+=d;out.push([x,y]);}return out;}
-function cellSVG(it,screen){
-  const t=it.tpl;let s='';
-  if(screen)s+=`<rect x="0" y="0" width="${t.w}" height="${t.h}" fill="none" stroke="#8fa39b" stroke-width="0.3" stroke-dasharray="1.5 1"/>`;
+function cellMarks(it,screen){
+  const t=it.tpl,sel=screen&&it.id===S.sel;let s='';
+  if(screen)s+=`<rect x="0" y="0" width="${t.w}" height="${t.h}" fill="none" stroke="${sel?'#00a3d9':'#8fa39b'}" stroke-width="${sel?0.7:0.3}" ${sel?'':'stroke-dasharray="1.5 1"'}/>`;
   else if(S.tplFrame)s+=`<rect x="0" y="0" width="${t.w}" height="${t.h}" fill="none" stroke="#aaa" stroke-width="0.2"/>`;
   if(t.folds&&(screen||S.foldPrint))for(const f of t.folds)s+=`<line x1="${f}" y1="0" x2="${f}" y2="${t.h}" stroke="${screen?'#7d8f88':'#999'}" stroke-width="${screen?0.35:0.2}" stroke-dasharray="2 1.5"/>`;
   if(screen||S.tplHoles)for(const c of cellHoles(t))s+=screen?`<circle cx="${c[0]}" cy="${c[1]}" r="${t.d/2}" style="fill:var(--mat)" stroke="rgba(0,0,0,.35)" stroke-width="0.25"/>`:`<circle cx="${c[0]}" cy="${c[1]}" r="${t.d/2}" fill="none" stroke="#888" stroke-width="0.2"/>`;
-  return `<svg viewBox="0 0 ${t.w} ${t.h}" preserveAspectRatio="none" aria-hidden="true">${s}</svg>`;
+  const tr=it.rot?`translate(${it.x+t.h},${it.y}) rotate(90)`:`translate(${it.x},${it.y})`;
+  return `<g transform="${tr}">${s}</g>`;
+}
+function cellOverlay(its,screen){const {W,H}=WH();return `<svg class="cuts deco cellov" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${its.filter(i=>i.kind==='cell').map(c=>cellMarks(c,screen)).join('')}</svg>`;}
+function refreshOverlay(p){const sh=stage.querySelector(`.sheet[data-p="${p}"]`);if(!sh)return;const o=sh.querySelector('.cellov');if(o)o.outerHTML=cellOverlay(onPage(p),true);}
+const centerIn=(o,c)=>{const x=o.x+o.w/2,y=o.y+o.h/2;return x>=c.x&&x<=c.x+c.w&&y>=c.y&&y<=c.y+c.h;};
+const attachedTo=c=>S.items.filter(o=>o.kind!=='cell'&&o.page===c.page&&centerIn(o,c));
+function cellUnder(it){let best=null,ba=0;for(const c of S.items){if(c.kind!=='cell'||c.page!==it.page)continue;const w=Math.min(it.x+it.w,c.x+c.w)-Math.max(it.x,c.x),h=Math.min(it.y+it.h,c.y+c.h)-Math.max(it.y,c.y);if(w>0&&h>0&&w*h>ba){ba=w*h;best=c;}}return best;}
+function fitToCell(im,c,avoid){
+  const t=c.tpl;let r={x:0,y:0,w:t.w,h:t.h};
+  if(avoid&&HOLES[t.holes]&&HOLES[t.holes].g){const z=t.off+t.d/2+2;r=t.side==='left'?{x:z,y:0,w:t.w-z,h:t.h}:{x:0,y:0,w:t.w-z,h:t.h};}
+  const R=c.rot?{x:t.h-(r.y+r.h),y:r.x,w:r.h,h:r.w}:r;
+  im.page=c.page;im.x=c.x+R.x;im.y=c.y+R.y;im.w=R.w;im.h=R.h;im.fit='cover';im.lock=false;
+  const regL=R.w>R.h,imgL=(im.rot?im.nh/im.nw:im.nw/im.nh)>1;if(regL!==imgL&&Math.abs(im.nw-im.nh)>2)im.rot=im.rot?0:90;
 }
 const cloneItem=it=>Object.assign({},it,{id:uid(),tpl:it.tpl?Object.assign({},it.tpl):undefined});
 const ordPos=(a,b)=>a.page-b.page||a.y-b.y||a.x-b.x;
@@ -433,18 +448,31 @@ function fillCells(){
   let n=0;for(const c of cells){const im=imgs.shift();if(!im)break;assignImg(c,im);S.items=S.items.filter(i=>i!==im);n++;}
   trimPages();return n;
 }
+function newCell(t,page){return {id:uid(),kind:'cell',name:t.n,tpl:Object.assign({},t),page,x:0,y:0,w:t.w,h:t.h,rot:0,fit:'cover'};}
 function tplPlace(t,n){
   const cells=tplLayout(t.w,t.h);
   if(!cells.length){toast('这个成品尺寸比可打印区域还大，换大一点的纸或减小边距');return null;}
-  S.items=S.items.filter(i=>!i.sample);
-  let want=n>0?n:cells.length,made=0,page=firstEmptyPage();
+  let want=n>0?n:cells.length,page=firstEmptyPage();const made=[];
   while(want>0){
     const use=cells.slice(0,Math.min(want,cells.length));
-    const placed=use.map(c=>{const it={id:uid(),kind:'cell',name:t.n,tpl:Object.assign({},t),page,x:0,y:0,w:t.w,h:t.h,rot:0,imgRot:0,avoid:S.tplAvoid,fit:'cover'};S.items.push(it);return {key:it.id,x:c.x,y:c.y,w:c.w,h:c.h,rot:c.rot};});
-    applyPlaced(placed,page);made+=use.length;want-=use.length;if(want>0)page=firstEmptyPage();
+    const placed=use.map(c=>{const it=newCell(t,page);S.items.push(it);made.push(it);return {key:it.id,x:c.x,y:c.y,w:c.w,h:c.h,rot:c.rot};});
+    applyPlaced(placed,page);want-=use.length;if(want>0)page=firstEmptyPage();
   }
-  const filled=fillCells();
-  return {made,filled,per:cells.length};
+  return {made,per:cells.length};
+}
+function addCells(t,n){
+  const A=area(),g=S.gap;if(t.w>Math.max(A.w,A.h)||Math.min(t.w,t.h)>Math.min(A.w,A.h)){toast('这个成品尺寸比可打印区域还大，换大一点的纸或减小边距');return [];}
+  const sel=byId(S.sel);let p=sel&&sel.page>=0?sel.page:Math.max(0,S.pages-1);if(p>=S.pages)S.pages=p+1;
+  const binFor=pg=>{const bin=makeBin(A.w+g,A.h+g);for(const o of onPage(pg))bin.occupy({x:o.x-A.x,y:o.y-A.y,w:o.w+g,h:o.h+g});return bin;};
+  let bin=binFor(p);const made=[];
+  for(let i=0;i<n;i++){
+    let sp=bin.find(t.w+g,t.h+g,true,'bl');
+    if(!sp){p=S.pages;S.pages++;bin=binFor(p);sp=bin.find(t.w+g,t.h+g,true,'bl');}
+    if(!sp)break;
+    bin.occupy({x:sp.x,y:sp.y,w:sp.w,h:sp.h});
+    const c=newCell(t,p);c.x=A.x+sp.x;c.y=A.y+sp.y;c.w=sp.w-g;c.h=sp.h-g;c.rot=sp.rot?90:0;S.items.push(c);made.push(c);
+  }
+  return made;
 }
 function foldLines(){const p=paper();if(!p.folds)return [];const {W,H}=WH();return p.folds.map(f=>W>=H?[f,0,f,H]:[0,f,W,f]);}
 function decoSVG(screen){
@@ -493,7 +521,7 @@ function makeBin(W,H){
 function packRects(rects,AW,AH,g,allowRot,heur){
   const bin=makeBin(AW+g,AH+g),placed=[],rest=[];
   for(const r of rects){
-    const p=bin.find(r.w+g,r.h+g,allowRot,heur);
+    const p=bin.find(r.w+g,r.h+g,allowRot&&!r.noRot,heur);
     if(!p){rest.push(r);continue;}
     bin.occupy({x:p.x,y:p.y,w:p.w,h:p.h});
     placed.push({key:r.key,x:p.x,y:p.y,w:p.w-g,h:p.h-g,rot:p.rot});
@@ -549,12 +577,23 @@ function flowAll(){
   S.pages=Math.max(1,page);
   return shrunk;
 }
+function flowWithCells(){
+  const A=area(),g=S.gap,used=new Set(),groups=[];
+  for(const c of S.items.filter(i=>i.kind==='cell')){const mem=attachedTo(c).filter(o=>!used.has(o));mem.forEach(o=>used.add(o));groups.push({key:c.id,w:c.w,h:c.h,noRot:mem.length>0,mem:mem.map(o=>({o,dx:o.x-c.x,dy:o.y-c.y}))});}
+  const loose=S.items.filter(o=>o.kind!=='cell'&&!used.has(o));
+  for(const it of loose){const fits=(it.w<=A.w+EPS&&it.h<=A.h+EPS)||(S.rotate&&it.h<=A.w+EPS&&it.w<=A.h+EPS);if(!fits){let f=Math.min(A.w/it.w,A.h/it.h);if(S.rotate)f=Math.max(f,Math.min(A.w/it.h,A.h/it.w));it.w*=f;it.h*=f;}}
+  let rest=[...groups,...loose.map(o=>({key:o.id,w:o.w,h:o.h}))].sort(ORDERS[0]),page=0;
+  while(rest.length){let best=null;for(const h of ['bssf','bl']){const r=packRects(rest,A.w,A.h,g,S.rotate,h);if(!best||r.placed.length>best.placed.length)best=r;}if(!best.placed.length)break;applyPlaced(best.placed,page);rest=best.rest;page++;}
+  S.pages=Math.max(1,page);
+  for(const gp of groups){const c=byId(gp.key);for(const m of gp.mem){m.o.x=c.x+m.dx;m.o.y=c.y+m.dy;m.o.page=c.page;}}
+}
 function runAuto(){
   const A=area();
   if(!S.items.length){toast('先添加图片');return;}
   if(A.w<=1||A.h<=1){toast('边距太大，没有可打印区域了');return;}
   const hasCells=S.items.some(i=>i.kind==='cell');
-  if(S.mode==='flow'||hasCells){const n=flowAll();if(hasCells&&S.mode!=='flow'){toast(`有活页页面，按原尺寸紧密排列，共 ${S.pages} 页`);renderAll();return;}toast(n?`已排好，共 ${S.pages} 页（${n} 张比纸大，已缩小到能放下）`:`已紧密排列，共 ${S.pages} 页`);}
+  if(hasCells){flowWithCells();toast(`活页按原尺寸紧密排列（贴在活页上的图跟着走），共 ${S.pages} 页`);renderAll();return;}
+  if(S.mode==='flow'){const n=flowAll();toast(n?`已排好，共 ${S.pages} 页（${n} 张比纸大，已缩小到能放下）`:`已紧密排列，共 ${S.pages} 页`);}
   else{
     if(S.scope==='all'){S.items.forEach(i=>i.page=0);S.pages=1;}
     let ok=true;
@@ -639,8 +678,8 @@ function makeItem(it,k,forPrint){
     const inn=document.createElement('div');inn.className='tplin';
     const box=document.createElement('div');box.className='tplimg';
     if(it.src){const img=document.createElement('img');img.src=it.src;img.alt=it.name;img.draggable=false;box.appendChild(img);}
-    else if(!forPrint)box.innerHTML='<span class="hint">拖图片<br>到这里</span>';
-    inn.appendChild(box);inn.insertAdjacentHTML('beforeend',cellSVG(it,!forPrint));el.appendChild(inn);
+    else if(!forPrint)box.innerHTML=`<span class="hint">${it.tpl.n.replace(/（.*/,'')}</span>`;
+    inn.appendChild(box);el.appendChild(inn);
     if(!forPrint){const d=document.createElement('span');d.className='dim';el.appendChild(d);if(it.id===S.sel)el.classList.add('sel');if(isOut(it))el.classList.add('out');}
     styleItem(el,it,k);return el;
   }
@@ -654,8 +693,8 @@ function makeItem(it,k,forPrint){
   styleItem(el,it,k);return el;
 }
 function cutSegs(its){
-  const o=1,L=3,out=[];
-  for(const it of its){const x1=it.x,y1=it.y,x2=it.x+it.w,y2=it.y+it.h;
+  const o=1,L=3,out=[],cells=its.filter(i=>i.kind==='cell');
+  for(const it of its){if(it.kind!=='cell'&&cells.some(c=>centerIn(it,c)))continue;const x1=it.x,y1=it.y,x2=it.x+it.w,y2=it.y+it.h;
     out.push([x1-o-L,y1,x1-o,y1],[x1,y1-o-L,x1,y1-o],[x2+o,y1,x2+o+L,y1],[x2,y1-o-L,x2,y1-o],
              [x1-o-L,y2,x1-o,y2],[x1,y2+o,x1,y2+o+L],[x2+o,y2,x2+o+L,y2],[x2,y2+o,x2,y2+o+L]);}
   return out;
@@ -683,7 +722,8 @@ function render(){
     sh.innerHTML=`<div class="printable" style="left:${A.x*K}px;top:${A.y*K}px;width:${Math.max(0,A.w*K)}px;height:${Math.max(0,A.h*K)}px"></div>`
       +(S.cut?cutSVG(its):'')
       +[0,1,2,3].map(i=>`<span class="reg" style="${i%2===0?'left:-22px':'right:-22px'};${i<2?'top:-22px':'bottom:-22px'}">${REG}</span>`).join('');
-    for(const it of its)sh.appendChild(makeItem(it,K,false));
+    for(const it of [...its.filter(i=>i.kind==='cell'),...its.filter(i=>i.kind!=='cell')])sh.appendChild(makeItem(it,K,false));
+    sh.insertAdjacentHTML('beforeend',cellOverlay(its,true));
     sh.insertAdjacentHTML('beforeend',decoSVG(true));
     if(outN){const b=document.createElement('div');b.className='oob';b.innerHTML=`<span>${outN} 张超出可打印区域，打印会被切掉</span><button type="button" data-fix="1">一键排版</button>`;sh.appendChild(b);}
     wrap.appendChild(sh);stage.appendChild(wrap);
@@ -693,32 +733,33 @@ function render(){
 function renderSummary(){
   const {W,H}=WH(),p=paper();
   const avg=S.pages?Array.from({length:S.pages},(_,i)=>util(i)).reduce((a,b)=>a+b,0)/S.pages:0;
-  $('#summary').innerHTML=`<b>${p.id==='custom'?'自定义':p.n.replace(/（.*/,'')}</b> ${f1(W)}×${f1(H)}mm · 可打印 ${f1(Math.max(0,area().w))}×${f1(Math.max(0,area().h))}mm · <b>${S.pages}</b> 页 · <b>${S.items.filter(i=>i.src).length}</b> 张${S.items.some(i=>i.kind==='cell')?` · 活页 <b>${S.items.filter(i=>i.kind==='cell').length}</b> 页`:''} · 平均利用率 <b>${Math.round(avg)}%</b>`;
+  $('#summary').innerHTML=`<b>${p.id==='custom'?'自定义':p.n.replace(/（.*/,'')}</b> ${f1(W)}×${f1(H)}mm · 可打印 ${f1(Math.max(0,area().w))}×${f1(Math.max(0,area().h))}mm · <b>${S.pages}</b> 页 · <b>${S.items.filter(i=>i.kind!=='cell').length}</b> 张${S.items.some(i=>i.kind==='cell')?` · 活页 <b>${S.items.filter(i=>i.kind==='cell').length}</b> 页`:''} · 平均利用率 <b>${Math.round(avg)}%</b>`;
 }
 function renderThumbs(){
-  const withImg=S.items.filter(i=>i.src);
+  const withImg=S.items.filter(i=>i.kind!=='cell');
   $('#imgCount').textContent=withImg.length?`(${withImg.length})`:'';
   const t=$('#thumbs');
+  const cl=$('#cellList');const cs=S.items.filter(i=>i.kind==='cell').sort(ordPos);
+  cl.hidden=!cs.length;cl.innerHTML=cs.length?`<div class="field"><span>活页（${cs.length}）· 点一下选中，被图片盖住时也能选</span><div class="chips">${cs.map((c,i)=>`<button type="button" class="chip${c.id===S.sel?' on':''}" data-pick="${c.id}">P${c.page+1} · ${c.tpl.n.replace(/（.*/,'')} ${i+1}</button>`).join('')}</div></div>`:'';
   if(!withImg.length){t.className='';t.innerHTML='<div class="empty">还没有图片。点「添加图片」，或把图片拖到中间的排版区。</div>';return;}
   t.className='thumbs';
-  t.innerHTML=withImg.map(it=>`<button type="button" class="thumb${it.id===S.sel?' sel':''}" data-pick="${it.id}" title="${it.name}"><img src="${it.src}" alt=""><span class="pg">P${it.page+1}${it.kind==='cell'?' · 页':''}</span></button>`).join('');
+  const cells=S.items.filter(i=>i.kind==='cell').sort(ordPos);
+  t.innerHTML=withImg.map(it=>`<button type="button" class="thumb${it.id===S.sel?' sel':''}" data-pick="${it.id}" title="${it.name}"><img src="${it.src}" alt=""><span class="pg">P${it.page+1}</span></button>`).join('');
+  if(cells.length)t.insertAdjacentHTML('afterend','');
 }
 function renderInsp(){
   const it=byId(S.sel),box=$('#insp');
   if(!it){box.innerHTML='<div class="empty">点一下排版区里的图片来调整尺寸、位置和旋转。<br>拖动右下角方块可以等比缩放。</div>';return;}
   if(it.kind==='cell'){
-    const t=it.tpl,hp=HOLES[t.holes],d=dpiOf(it);
-    const pill=d===null?'<span class="pill warn">空白页</span>':`<span class="pill ${d>=280?'good':d>=170?'warn':'bad'}">${d} DPI · ${d>=280?'清晰':d>=170?'可用':'偏糊'}</span>`;
+    const t=it.tpl,hp=HOLES[t.holes],att=attachedTo(it).length;
     box.innerHTML=`<div class="insp">
-      <div class="full row" style="gap:8px"><span class="iname grow">${t.n}</span>${pill}</div>
-      <div class="full note">成品 ${f1(t.w)}×${f1(t.h)}mm · ${hp.g?hp.g.length+1+' 孔':'无孔'}${t.folds?' · 折线 '+t.folds.join('/')+'mm':''}<br>${it.src?'图片：'+it.name:'把一张图拖到这一页上就会放进来，再拖一张会替换。'}</div>
+      <div class="full row" style="gap:8px"><span class="iname grow">${t.n}</span><span class="pill warn">活页</span></div>
+      <div class="full note">成品 ${f1(t.w)}×${f1(t.h)}mm · ${hp.g?hp.g.length+1+' 孔':'无孔'}${t.folds?' · 折线 '+t.folds.join('/')+'mm':''}<br>${att?`上面有 ${att} 张图，拖动这一页时会一起移动。`:'图片可以自由摆在活页上；选中图片后能一键贴合这一页。'}</div>
+      <div class="field"><span>X（距左边）</span><div class="unit"><input id="ix" type="number" step="0.5" value="${f1(it.x)}"></div></div>
+      <div class="field"><span>Y（距上边）</span><div class="unit"><input id="iy" type="number" step="0.5" value="${f1(it.y)}"></div></div>
       <div class="full row"><label style="color:var(--muted)">孔在</label><div class="seg grow" role="group"><button type="button" data-act="cleft" aria-pressed="${t.side==='left'}">左边</button><button type="button" data-act="cright" aria-pressed="${t.side==='right'}">右边（背面）</button></div></div>
-      <label class="check full"><input type="checkbox" id="cavoid" ${it.avoid?'checked':''}>图片避开孔区</label>
-      <div class="full row">
-        ${it.src?'<button class="btn" data-act="cimgrot" type="button">图片转 90°</button><button class="btn" data-act="cout" type="button">取出图片</button>':''}
-        <button class="btn" data-act="rot" type="button">整页旋转 90°</button>
-      </div>
-      <div class="full row"><button class="btn" data-act="dup" type="button">复制这一页</button><button class="btn" data-act="fill" type="button">用这页铺满一张纸</button><button class="btn danger" data-act="del" type="button">删除</button></div>
+      <div class="full row"><button class="btn" data-act="rot" type="button">整页旋转 90°</button><button class="btn" data-act="dup" type="button">复制这一页</button></div>
+      <div class="full row"><button class="btn" data-act="fill" type="button">用这页铺满一张纸</button><button class="btn danger" data-act="del" type="button">删除这页</button></div>
       ${isOut(it)?'<div class="note warn full">这一页超出了可打印区域。</div>':''}
     </div>`;
     return;
@@ -736,6 +777,7 @@ function renderInsp(){
     <div class="full row">
       <button class="btn" data-act="smaller" type="button">缩小 10%</button><button class="btn" data-act="bigger" type="button">放大 10%</button><button class="btn" data-act="rot" type="button">旋转 90°</button>
     </div>
+    ${cellUnder(it)?`<div class="full row"><span style="color:var(--muted)">贴合活页</span><button class="btn" data-act="fitcell" type="button">铺满这一页</button><button class="btn" data-act="fitavoid" type="button">避开孔区</button></div>`:''}
     <div class="full row">
       <button class="btn" data-act="dup" type="button">复制一张</button><button class="btn" data-act="fill" type="button">用这张铺满一页</button><button class="btn danger" data-act="del" type="button">删除</button>
     </div>
@@ -768,7 +810,7 @@ function renderGuide(){
     tips.push('自己做双面活页：正面孔在左，印背面前切到「右边（背面）」，图案就不会压到孔。');
     if(!S.holeAvoid)tips.push('<span>没开「避开孔区」，图片可能被孔打穿。</span>');
   }
-  if(S.items.some(i=>i.kind==='cell'))tips.push('活页拼版：沿灰色细框裁切（可以打开「加裁切线」更好对齐），再用对应的活页打孔器对着孔位圈打孔。先用普通纸试一张对孔位。');
+  if(S.items.some(i=>i.kind==='cell'))tips.push('活页拼版：图片可以自由摆放；选中压在活页上的图，点「铺满这一页」或「避开孔区」就能贴合。印完沿灰色细框裁切，再用对应的活页打孔器对着孔位圈打孔。先用普通纸试一张对孔位。');
   if(paper().folds)tips.push(`折页展开宽 ${f1(WH().W)}mm，折线距左边 ${paper().folds.join(' / ')}mm。跨折线的图会被折到，重要内容放在单面内。`);
   const mn=Math.min(S.m.t,S.m.r,S.m.b,S.m.l);
   if(mn<3)tips.push('<span>边距小于 3mm：不开无边距时，多数打印机最外圈 3–5mm 印不到，边缘可能被切掉。</span>');
@@ -809,10 +851,10 @@ function syncControls(){
   $('#foldRow').hidden=!paper().folds;$('#fprint').checked=S.foldPrint;
   const ts=$('#tplSel');if(!ts.options.length)ts.innerHTML=PAPERS.filter(p=>p.holes).map(p=>`<option value="${p.id}">${p.n}  ${f1(p.w)}×${f1(p.h)}</option>`).join('');
   ts.value=S.tplId;$('#tL').setAttribute('aria-pressed',S.tplSide==='left');$('#tR').setAttribute('aria-pressed',S.tplSide==='right');
-  $('#tplN').value=S.tplN||'';$('#tplAvoid').checked=S.tplAvoid;$('#tplFrame').checked=S.tplFrame;$('#tplHoles').checked=S.tplHoles;
+  $('#tplN').value=S.tplN||1;$('#tplFrame').checked=S.tplFrame;$('#tplHoles').checked=S.tplHoles;
   {const t=tplOf(S.tplId),pp=paper();
-   if(pp.holes)$('#tplInfo').innerHTML='当前纸张本身就是活页尺寸。拼版要先换成 A4 等大纸，点「排到纸上」会自动换成 A4。';
-   else{const n=tplLayout(t.w,t.h).length;$('#tplInfo').textContent=n?`当前纸上每张可放 ${n} 页（成品 ${f1(t.w)}×${f1(t.h)}mm）`:'成品比可打印区域还大，换大一点的纸或减小边距';}}
+   if(pp.holes)$('#tplInfo').innerHTML='当前纸张本身就是活页尺寸。添加活页时会自动换成 A4。';
+   else{const n=tplLayout(t.w,t.h).length;$('#tplInfo').textContent=n?`成品 ${f1(t.w)}×${f1(t.h)}mm，当前纸一张最多放 ${n} 页。活页会放进空位，放不下自动加页。`:'成品比可打印区域还大，换大一点的纸或减小边距';}}
   const ms=$('#media');if(!ms.options.length)ms.innerHTML=Object.entries(MEDIA).map(([k,m])=>`<option value="${k}">${m.n}</option>`).join('');
   ms.value=S.media;$('#cut').checked=S.cut;$('#dpi').value=String(S.dpi);
   const {W,H}=WH(),pv=$('#mpv');pv.style.aspectRatio=`${W}/${H}`;pv.style.width=W>H?'56px':'40px';
@@ -825,16 +867,20 @@ function renderAll(){syncControls();render();renderSide();save();}
 $('#paper').addEventListener('change',e=>{S.paperId=e.target.value;const p=paper();S.orient=p.land?'landscape':'portrait';S.holes=p.holes||'none';S.holeD=(HOLES[S.holes].d)||5.5;renderAll();});
 $('#tplSel').onchange=e=>{S.tplId=e.target.value;renderAll();};
 $('#tL').onclick=()=>{S.tplSide='left';renderAll();};$('#tR').onclick=()=>{S.tplSide='right';renderAll();};
-$('#tplN').addEventListener('change',e=>{S.tplN=Math.max(0,Math.floor(+e.target.value||0));renderAll();});
-$('#tplAvoid').onchange=e=>{S.tplAvoid=e.target.checked;save();};
+$('#tplN').addEventListener('change',e=>{S.tplN=Math.min(60,Math.max(1,Math.floor(+e.target.value||1)));renderAll();});
 $('#tplFrame').onchange=e=>{S.tplFrame=e.target.checked;renderAll();};
 $('#tplHoles').onchange=e=>{S.tplHoles=e.target.checked;renderAll();};
+function toBigSheet(){if(paper().holes){S.paperId='A4';S.orient='portrait';S.holes='none';if(S.m.t<5)S.m={t:5,r:5,b:5,l:5};if(S.gap<2)S.gap=3;return true;}return false;}
 $('#tplGo').onclick=()=>{
-  if(paper().holes){S.paperId='A4';S.orient='portrait';S.holes='none';if(S.m.t<5)S.m={t:5,r:5,b:5,l:5};if(S.gap<2)S.gap=3;}
-  const r=tplPlace(tplOf(S.tplId),S.tplN);if(!r){renderAll();return;}
-  renderAll();toast(`排了 ${r.made} 页（每张纸 ${r.per} 页）${r.filled?`，放入 ${r.filled} 张图`:'，把图片拖进页面，或直接添加图片'}`);
+  const sw=toBigSheet();if(S.items.length&&S.items.every(i=>i.sample)){S.items=[];S.pages=1;}
+  const made=addCells(tplOf(S.tplId),Math.max(1,S.tplN||1));
+  if(made.length)S.sel=made[made.length-1].id;
+  renderAll();if(made.length)toast(`${sw?'已换成 A4，':''}添加了 ${made.length} 页活页，可以拖动、旋转或删除`);
 };
-$('#tplFillImgs').onclick=()=>{const n=fillCells();renderAll();toast(n?`放入了 ${n} 张图`:'没有空白页或没有可放的图片');};
+$('#tplSheet').onclick=()=>{
+  const sw=toBigSheet();if(S.items.length&&S.items.every(i=>i.sample)){S.items=[];S.pages=1;}
+  const r=tplPlace(tplOf(S.tplId),0);renderAll();if(r)toast(`${sw?'已换成 A4，':''}新的一张纸铺了 ${r.made.length} 页活页`);
+};
 $('#holes').onchange=e=>{S.holes=e.target.value;S.holeD=(HOLES[S.holes].d)||5.5;renderAll();};
 $('#hsL').onclick=()=>{S.holeSide='left';renderAll();};$('#hsR').onclick=()=>{S.holeSide='right';renderAll();};
 $('#hd').addEventListener('change',e=>{S.holeD=Math.min(12,Math.max(2,+e.target.value||5.5));renderAll();});
@@ -872,12 +918,13 @@ function arm(btn,label,fn){
 }
 $('#clearAll').onclick=e=>{if(!S.items.length)return;arm(e.currentTarget,'确认清空？',()=>{S.items=[];S.sel=null;S.pages=1;renderAll();});};
 
+$('#cellList').addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(!b)return;S.sel=b.dataset.pick;renderAll();});
 $('#thumbs').addEventListener('click',e=>{const b=e.target.closest('[data-pick]');if(!b)return;S.sel=b.dataset.pick;renderAll();
   const el=stage.querySelector(`.item[data-id="${S.sel}"]`);if(el)el.scrollIntoView({block:'nearest',inline:'nearest'});});
 
 $('#right').addEventListener('change',e=>{
   const it=byId(S.sel);if(!it)return;const t=e.target,v=+t.value;
-  if(t.id==='cavoid'){it.avoid=t.checked;renderAll();return;}
+  if(it.kind==='cell'&&(t.id==='ix'||t.id==='iy')){const dx=t.id==='ix'?v-it.x:0,dy=t.id==='iy'?v-it.y:0;for(const o of attachedTo(it)){o.x+=dx;o.y+=dy;}it.x+=dx;it.y+=dy;renderAll();return;}
   if(t.id==='iw'&&v>0){const a=it.w/it.h;it.w=v;if(it.lock)it.h=v/a;else if(it.fit!=='cover')it.fit='cover';}
   else if(t.id==='ih'&&v>0){const a=it.w/it.h;it.h=v;if(it.lock)it.w=v*a;else if(it.fit!=='cover')it.fit='cover';}
   else if(t.id==='ix')it.x=v;else if(t.id==='iy')it.y=v;
@@ -892,20 +939,20 @@ $('#right').addEventListener('click',e=>{
   if(act==='toA4'&&paper().holes){
     const p=paper();S.paperId='A4';S.orient='portrait';S.holes='none';if(S.m.t<5){S.m={t:5,r:5,b:5,l:5};}if(S.gap<2)S.gap=3;
     S.tplId=p.id;S.items=S.items.filter(i=>!i.sample);
-    const loose=S.items.filter(i=>i.kind!=='cell');
+    const loose=S.items.filter(i=>i.kind!=='cell').sort(ordPos);
     if(!S.items.some(i=>i.kind==='cell')){loose.forEach(i=>i.page=-1);S.pages=0;}
     const r=tplPlace(tplOf(p.id),loose.length);
-    loose.forEach(i=>{if(i.page<0&&S.items.includes(i))i.page=0;});
+    if(r)r.made.forEach((c,i)=>{if(loose[i])fitToCell(loose[i],c,false);});
+    loose.forEach(i=>{if(i.page<0)i.page=0;});
     if(!S.pages)S.pages=1;
-    renderAll();if(r)toast(`已改成 A4 拼版：${r.made} 个「${p.n}」页面，放入 ${r.filled} 张图`);return;
+    renderAll();if(r)toast(`已改成 A4 拼版：${r.made.length} 个「${p.n}」页面${loose.length?'，图片已贴合到各页，可以继续自由调整':''}`);return;
   }
   if(act==='toA4'){S.paperId='A4';S.orient='portrait';S.holes='none';S.cut=true;if(S.m.t<5){S.m={t:5,r:5,b:5,l:5};}if(S.gap<2)S.gap=3;if(S.items.length){S.mode='flow';flowAll();}renderAll();toast('已改成 A4 拼版，并打开裁切线');return;}
   const it=byId(S.sel);if(!it)return;
   if(act==='cleft'||act==='cright'){it.tpl.side=act==='cleft'?'left':'right';}
-  else if(act==='cimgrot'){it.imgRot=it.imgRot?0:90;}
-  else if(act==='cout'){const a=it.nh/it.nw,w=Math.min(60,it.w),n={id:uid(),name:it.name,src:it.src,img:it.img,nw:it.nw,nh:it.nh,page:it.page,x:it.x+6,y:it.y+6,w,h:w*a,rot:0,fit:'contain',lock:true};S.items.push(n);it.src=null;it.img=null;S.sel=n.id;}
+  else if(act==='fitcell'||act==='fitavoid'){const c=cellUnder(it);if(c)fitToCell(it,c,act==='fitavoid');}
   else if(act==='smaller'||act==='bigger'){const f=act==='bigger'?1.1:1/1.1,cx=it.x+it.w/2,cy=it.y+it.h/2;it.w*=f;it.h*=f;it.x=cx-it.w/2;it.y=cy-it.h/2;}
-  else if(act==='rot'){const cx=it.x+it.w/2,cy=it.y+it.h/2;it.rot=it.rot?0:90;[it.w,it.h]=[it.h,it.w];it.x=cx-it.w/2;it.y=cy-it.h/2;}
+  else if(act==='rot'){const cx=it.x+it.w/2,cy=it.y+it.h/2;if(it.kind==='cell'){for(const o of attachedTo(it)){const ox=o.x+o.w/2-cx,oy=o.y+o.h/2-cy;o.rot=o.rot?0:90;[o.w,o.h]=[o.h,o.w];o.x=cx-oy-o.w/2;o.y=cy+ox-o.h/2;}}it.rot=it.rot?0:90;[it.w,it.h]=[it.h,it.w];it.x=cx-it.w/2;it.y=cy-it.h/2;}
   else if(act==='dup'){const n=Object.assign(cloneItem(it),{x:it.x+5,y:it.y+5});S.items.push(n);S.sel=n.id;}
   else if(act==='fill'){fillCopies(it);return;}
   else if(act==='del'){S.items=S.items.filter(i=>i!==it);S.sel=null;}
@@ -930,6 +977,7 @@ stage.addEventListener('pointerdown',e=>{
   const sheet=itEl.parentElement,r=sheet.getBoundingClientRect();
   drag={it,el:itEl,resize:!!e.target.closest('.handle'),sx:e.clientX,sy:e.clientY,ox:it.x,oy:it.y,ow:it.w,oh:it.h,
         gx:(e.clientX-r.left)/K-it.x,gy:(e.clientY-r.top)/K-it.y,moved:false};
+  if(it.kind==='cell')drag.att=attachedTo(it).map(o=>({o,ox:o.x,oy:o.y,el:stage.querySelector(`.item[data-id="${o.id}"]`)}));
 });
 function snapAxis(v,size,cands,th){let best=v,bd=th;for(const c of cands){const d=Math.abs(c-v);if(d<bd){bd=d;best=c;}}return best;}
 window.addEventListener('pointermove',e=>{
@@ -944,7 +992,7 @@ window.addEventListener('pointermove',e=>{
   }else{
     let target=drag.el.parentElement;
     for(const sh of stage.querySelectorAll('.sheet')){const r=sh.getBoundingClientRect();if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom){target=sh;break;}}
-    if(target!==drag.el.parentElement){target.appendChild(drag.el);it.page=+target.dataset.p;}
+    let movedPage=null;if(target!==drag.el.parentElement){movedPage=it.page;target.appendChild(drag.el);it.page=+target.dataset.p;}
     const r=target.getBoundingClientRect();
     let nx=(e.clientX-r.left)/K-drag.gx,ny=(e.clientY-r.top)/K-drag.gy;
     if(!e.altKey){
@@ -956,18 +1004,14 @@ window.addEventListener('pointermove',e=>{
   }
   styleItem(drag.el,it,K);
   drag.el.classList.toggle('out',isOut(it));
+  if(it.kind==='cell'&&!drag.resize){
+    const dx=it.x-drag.ox,dy=it.y-drag.oy,sheet=drag.el.parentElement;
+    for(const a of drag.att||[]){a.o.x=a.ox+dx;a.o.y=a.oy+dy;if(a.o.page!==it.page){a.o.page=it.page;if(a.el)sheet.appendChild(a.el);}if(a.el)styleItem(a.el,a.o,K);}
+    for(let p=0;p<S.pages;p++)refreshOverlay(p);
+  }
 });
 window.addEventListener('pointerup',e=>{
   if(!drag)return;const d=drag;drag=null;
-  if(d.moved&&!d.resize&&d.it.kind!=='cell'&&d.it.src){
-    const hit=document.elementsFromPoint(e.clientX,e.clientY).map(x=>x.closest&&x.closest('.item.cell')).find(x=>x&&x!==d.el);
-    const cell=hit&&byId(hit.dataset.id);
-    if(cell){
-      if(cell.src){const old={src:cell.src,img:cell.img,nw:cell.nw,nh:cell.nh,name:cell.name};assignImg(cell,d.it);Object.assign(d.it,old,{rot:0,fit:'contain',lock:true,x:d.ox,y:d.oy,h:d.it.w*old.nh/old.nw});}
-      else{assignImg(cell,d.it);S.items=S.items.filter(i=>i!==d.it);}
-      S.sel=cell.id;toast('已放进这一页');
-    }
-  }
   if(d.moved)renderAll();
 });
 stage.addEventListener('wheel',e=>{if(!e.ctrlKey)return;e.preventDefault();S.zoom=Math.min(4,Math.max(0.25,S.zoom*(e.deltaY<0?1.1:1/1.1)));render();},{passive:false});
@@ -975,7 +1019,8 @@ document.addEventListener('keydown',e=>{
   if(/INPUT|SELECT|TEXTAREA/.test(e.target.tagName))return;
   const it=byId(S.sel);if(!it)return;
   const st=e.shiftKey?10:1;let hit=true;
-  if(e.key==='ArrowLeft')it.x-=st;else if(e.key==='ArrowRight')it.x+=st;else if(e.key==='ArrowUp')it.y-=st;else if(e.key==='ArrowDown')it.y+=st;
+  const mv=(dx,dy)=>{if(it.kind==='cell')for(const o of attachedTo(it)){o.x+=dx;o.y+=dy;}it.x+=dx;it.y+=dy;};
+  if(e.key==='ArrowLeft')mv(-st,0);else if(e.key==='ArrowRight')mv(st,0);else if(e.key==='ArrowUp')mv(0,-st);else if(e.key==='ArrowDown')mv(0,st);
   else if(e.key==='Delete'||e.key==='Backspace'){S.items=S.items.filter(i=>i!==it);S.sel=null;}
   else if((e.key==='+'||e.key==='=')&&it.kind!=='cell'){const c=[it.x+it.w/2,it.y+it.h/2];it.w*=1.05;it.h*=1.05;it.x=c[0]-it.w/2;it.y=c[1]-it.h/2;}
   else if(e.key==='-'&&it.kind!=='cell'){const c=[it.x+it.w/2,it.y+it.h/2];it.w/=1.05;it.h/=1.05;it.x=c[0]-it.w/2;it.y=c[1]-it.h/2;}
@@ -996,10 +1041,7 @@ async function addFiles(files){
   if(!list.length)return;
   const hadSamples=S.items.length&&S.items.every(i=>i.sample);
   if(hadSamples){S.items=[];S.pages=1;}
-  const empties=S.items.filter(i=>i.kind==='cell'&&!i.src).sort(ordPos),rest=[];let intoCells=0;
-  for(const im of list){const c=empties.shift();if(c){assignImg(c,im);intoCells++;S.sel=c.id;}else rest.push(im);}
-  if(rest.length){S.items.push(...rest);placeNew(rest);S.sel=rest[rest.length-1].id;}
-  if(intoCells){renderAll();toast(`${intoCells} 张放进了空白活页${rest.length?`，另外 ${rest.length} 张放在纸上`:''}`);return;}
+  S.items.push(...list);placeNew(list);S.sel=list[list.length-1].id;
   renderAll();
   toast(hadSamples?`已移除示例，添加了 ${list.length} 张。点「一键排版」铺满`:`添加了 ${list.length} 张`);
 }
@@ -1018,7 +1060,8 @@ function buildPrint(){
   for(let p=0;p<S.pages;p++){
     const sh=document.createElement('div');sh.className='psheet';sh.style.width=W+'mm';sh.style.height=H+'mm';
     const its=onPage(p);if(S.cut)sh.innerHTML=cutSVG(its);
-    for(const it of its)sh.appendChild(makeItem(it,null,true));
+    for(const it of its.filter(i=>i.kind!=='cell'))sh.appendChild(makeItem(it,null,true));
+    sh.insertAdjacentHTML('beforeend',cellOverlay(its,false));
     sh.insertAdjacentHTML('beforeend',decoSVG(false));
     root.appendChild(sh);
   }
@@ -1055,7 +1098,8 @@ function pageCanvas(p,dpi){
   const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.imageSmoothingQuality='high';
   const its=onPage(p);
   if(S.cut){ctx.strokeStyle='#000';ctx.lineWidth=Math.max(1,0.2*k);for(const s of cutSegs(its)){ctx.beginPath();ctx.moveTo(s[0]*k,s[1]*k);ctx.lineTo(s[2]*k,s[3]*k);ctx.stroke();}}
-  for(const it of its)drawItem(ctx,it,k);
+  for(const it of its.filter(i=>i.kind!=='cell'))drawItem(ctx,it,k);
+  for(const it of its.filter(i=>i.kind==='cell'))drawItem(ctx,it,k);
   if(S.foldPrint){ctx.save();ctx.strokeStyle='#999';ctx.lineWidth=Math.max(1,0.2*k);ctx.setLineDash([2*k,1.5*k]);for(const l of foldLines()){ctx.beginPath();ctx.moveTo(l[0]*k,l[1]*k);ctx.lineTo(l[2]*k,l[3]*k);ctx.stroke();}ctx.restore();}
   if(S.holePrint){ctx.strokeStyle='#888';ctx.lineWidth=Math.max(1,0.2*k);for(const c of holeCenters()){ctx.beginPath();ctx.arc(c[0]*k,c[1]*k,S.holeD/2*k,0,Math.PI*2);ctx.stroke();}}
   return c;
